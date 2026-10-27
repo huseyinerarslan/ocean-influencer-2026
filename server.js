@@ -6,6 +6,7 @@ const bcrypt=require('bcryptjs');
 const jwt=require('jsonwebtoken');
 const {Pool}=require('pg');
 const {installImportRoutes,seedTemplates}=require('./import-routes');
+const {installEditRoutes}=require('./edit-routes');
 
 const app=express();
 const PORT=Number(process.env.PORT||3000);
@@ -66,6 +67,7 @@ app.get('/api/orders/:id/activity',auth,async(req,res)=>{const q=await pool.quer
 app.post('/api/orders/:id/dhl/create',auth,async(req,res)=>res.status(501).json({error:'DHL eCommerce API bilgileri bekleniyor',code:'DHL_NOT_CONFIGURED'}));
 
 installImportRoutes(app,pool,auth);
+installEditRoutes(app,pool,auth);
 app.use(express.static(path.join(__dirname,'public')));
 app.get('*',(req,res)=>res.sendFile(path.join(__dirname,'public','index.html')));
 schema().then(async()=>{await seedTemplates(pool);app.listen(PORT,()=>console.log(`Ocean Influencer running on ${PORT}`))}).catch(e=>{console.error(e);process.exit(1)});
