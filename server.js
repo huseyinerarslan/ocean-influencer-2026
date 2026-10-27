@@ -7,6 +7,7 @@ const jwt=require('jsonwebtoken');
 const {Pool}=require('pg');
 const {installImportRoutes}=require('./import-routes-safe');
 const {installEditRoutes}=require('./edit-routes');
+const {installCatalogRoutes}=require('./catalog-import-routes');
 
 const app=express();
 const PORT=Number(process.env.PORT||3000);
@@ -68,6 +69,7 @@ app.post('/api/orders/:id/dhl/create',auth,async(req,res)=>res.status(501).json(
 
 installImportRoutes(app,pool,auth);
 installEditRoutes(app,pool,auth);
+installCatalogRoutes(app,pool,auth);
 app.use(express.static(path.join(__dirname,'public')));
 app.get('*',(req,res)=>res.sendFile(path.join(__dirname,'public','index.html')));
 schema().then(()=>app.listen(PORT,()=>console.log(`Ocean Influencer running on ${PORT}`))).catch(e=>{console.error(e);process.exit(1)});
