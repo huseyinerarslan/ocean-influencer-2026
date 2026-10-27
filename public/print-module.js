@@ -42,4 +42,9 @@
   }
 
   ensureMenuAndView();
+
+  const hotfix=document.createElement('script');
+  hotfix.src='/mobile-hotfix.js?v=20261027-1900';
+  hotfix.defer=true;
+  document.head.appendChild(hotfix);
 })();
