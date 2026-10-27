@@ -8,9 +8,9 @@
     #contacts .contact-groups{display:grid;gap:10px;margin-top:18px}
     #contacts .contact-group{border:1px solid #e2e8f0;border-radius:14px;padding:14px;background:#fff}
     #contacts .contact-group-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:8px}
-    #contacts .contact-group-name{font-weight:800;font-size:18px}.contact-phone{color:#718096;margin-top:2px}
+    #contacts .contact-group-name{font-weight:800;font-size:18px}
     #contacts .contact-entry{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 0;border-top:1px solid #edf1f5}
-    #contacts .contact-entry:first-of-type{border-top:0}.contact-place{font-weight:650}.contact-address{font-size:13px;color:#718096;margin-top:3px;white-space:normal}
+    #contacts .contact-entry:first-of-type{border-top:0}.contact-place{font-weight:650}.contact-phone{color:#607087;font-size:13px;margin-top:2px}.contact-address{font-size:13px;color:#718096;margin-top:3px;white-space:normal}
     .contact-form-actions{display:flex;gap:8px;flex-wrap:wrap}
     @media(max-width:900px){
       html,body{max-width:100%;overflow-x:hidden!important}
@@ -36,8 +36,8 @@
   function groupContacts(rows){
     const map=new Map();
     for(const x of rows){
-      const key=norm(x.name)+'|'+String(x.phone||'').replace(/\D/g,'');
-      if(!map.has(key))map.set(key,{name:x.name||'',phone:x.phone||'',rows:[]});
+      const key=norm(x.name);
+      if(!map.has(key))map.set(key,{name:x.name||'',rows:[]});
       map.get(key).rows.push(x);
     }
     return [...map.values()].sort((a,b)=>a.name.localeCompare(b.name,'tr'));
@@ -69,11 +69,11 @@
 
   window.loadContacts=async function(){
     contacts=await api('/api/contacts');
-    if(byId('nc'))byId('nc').innerHTML='<option value="">Yeni kişi / seçiniz</option>'+contacts.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');
+    if(byId('nc'))byId('nc').innerHTML='<option value="">Yeni kişi / seçiniz</option>'+contacts.map(x=>`<option value="${x.id}">${esc(x.name)}${x.city?` · ${esc(x.city)}`:''}</option>`).join('');
     const list=byId('contactList');if(!list)return;
     const groups=groupContacts(contacts);
     list.className='contact-groups';
-    list.innerHTML=groups.map(g=>`<div class="contact-group"><div class="contact-group-head"><div><div class="contact-group-name">${esc(g.name)}</div><div class="contact-phone">${esc(g.phone||'Telefon yok')}</div></div>${g.rows.length>1?`<span class="badge">${g.rows.length} adres/kayıt</span>`:''}</div>${g.rows.map(x=>`<div class="contact-entry"><div><div class="contact-place">${esc([x.city,x.district].filter(Boolean).join(' / ')||'Konum bilgisi yok')}</div><div class="contact-address">${esc(x.address||'Adres bilgisi yok')}</div></div><button class="btn" type="button" onclick="editContactInline(${x.id})">Düzenle</button></div>`).join('')}</div>`).join('');
+    list.innerHTML=groups.map(g=>`<div class="contact-group"><div class="contact-group-head"><div class="contact-group-name">${esc(g.name)}</div>${g.rows.length>1?`<span class="badge">${g.rows.length} kayıt</span>`:''}</div>${g.rows.map(x=>`<div class="contact-entry"><div><div class="contact-place">${esc([x.city,x.district].filter(Boolean).join(' / ')||'Konum bilgisi yok')}</div><div class="contact-phone">${esc(x.phone||'Telefon yok')}</div><div class="contact-address">${esc(x.address||'Adres bilgisi yok')}</div></div><button class="btn" type="button" onclick="editContactInline(${x.id})">Düzenle</button></div>`).join('')}</div>`).join('');
   };
 
   window.saveContact=async function(){
