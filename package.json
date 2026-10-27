@@ -1,11 +1,12 @@
 {
   "name": "ocean-influencer-2026",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "main": "server.js",
   "scripts": {"start": "node server.js"},
   "engines": {"node": ">=20"},
   "dependencies": {
+    "adm-zip": "^0.5.16",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.7",
     "express": "^4.21.2",
