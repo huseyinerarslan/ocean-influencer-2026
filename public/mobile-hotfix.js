@@ -85,4 +85,8 @@
 
   ensureContactCancel();
   setTimeout(()=>{if(!document.getElementById('app')?.classList.contains('hidden'))window.loadContacts().catch(console.error)},150);
+
+  if(!document.getElementById('ocean-pro-theme-loader')){
+    const s=document.createElement('script');s.id='ocean-pro-theme-loader';s.src='/pro-theme.js?v=1';document.head.appendChild(s);
+  }
 })();
