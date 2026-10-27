@@ -5,7 +5,7 @@ const cookieParser=require('cookie-parser');
 const bcrypt=require('bcryptjs');
 const jwt=require('jsonwebtoken');
 const {Pool}=require('pg');
-const {installImportRoutes,seedTemplates}=require('./import-routes');
+const {installImportRoutes}=require('./import-routes-safe');
 const {installEditRoutes}=require('./edit-routes');
 
 const app=express();
@@ -70,4 +70,4 @@ installImportRoutes(app,pool,auth);
 installEditRoutes(app,pool,auth);
 app.use(express.static(path.join(__dirname,'public')));
 app.get('*',(req,res)=>res.sendFile(path.join(__dirname,'public','index.html')));
-schema().then(async()=>{await seedTemplates(pool);app.listen(PORT,()=>console.log(`Ocean Influencer running on ${PORT}`))}).catch(e=>{console.error(e);process.exit(1)});
+schema().then(()=>app.listen(PORT,()=>console.log(`Ocean Influencer running on ${PORT}`))).catch(e=>{console.error(e);process.exit(1)});
