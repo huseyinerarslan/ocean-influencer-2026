@@ -96,6 +96,18 @@ function installCatalogRoutes(app,pool,auth){
     const q=await pool.query(`SELECT s.*,COALESCE(json_agg(json_build_object('item_code',si.component_item_no,'item_name',si.component_name,'barcode',si.component_barcode,'qty',si.qty) ORDER BY si.id) FILTER (WHERE si.id IS NOT NULL),'[]') items FROM product_sets s LEFT JOIN set_items si ON si.set_id=s.id WHERE s.active=true GROUP BY s.id ORDER BY s.set_name`);
     res.json(q.rows);
   });
+
+  (async()=>{
+    try{
+      await ensureSchema(pool);
+      const q=await pool.query(`SELECT
+        (SELECT COUNT(*)::int FROM products WHERE active=true) AS products,
+        (SELECT COUNT(*)::int FROM product_sets WHERE active=true) AS sets,
+        (SELECT COUNT(*)::int FROM set_items) AS set_items`);
+      const c=q.rows[0]||{};
+      console.log(`CATALOG_COUNTS products=${c.products||0} sets=${c.sets||0} set_items=${c.set_items||0}`);
+    }catch(e){console.log('CATALOG_COUNTS unavailable')}
+  })();
 }
 
 module.exports={installCatalogRoutes};
