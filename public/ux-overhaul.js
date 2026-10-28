@@ -8,8 +8,8 @@
   const css=document.createElement('style');
   css.textContent=`
   :root{--ux-navy:#10243a;--ux-blue:#1d628f;--ux-bg:#f4f7fa;--ux-line:#dfe7ef;--ux-muted:#718096;--ux-text:#172033}
-  .ocean-brand-logo{width:176px!important;height:45px!important;object-fit:contain!important;object-position:left center!important;filter:brightness(0) invert(1)!important;overflow:visible!important}
-  .ocean-login-logo{width:250px!important;height:64px!important;object-fit:contain!important;object-position:left center!important;margin-bottom:18px!important}
+  .ocean-brand-logo{width:176px!important;height:auto!important;object-fit:contain!important;object-position:left center!important;filter:brightness(0) invert(1)!important;overflow:visible!important}
+  .ocean-login-logo{width:260px!important;height:auto!important;object-fit:contain!important;object-position:center!important;margin:0 auto 18px!important}
   .ocean-top-logo{display:none!important}.top .muted{font-size:12px!important;letter-spacing:.06em!important;text-transform:none!important;color:#758397!important}.top .muted:after{content:'Influencer Operasyon';font-size:12px!important}
   .side{width:228px!important}.app{grid-template-columns:228px 1fr!important}.brand{padding:4px 8px 18px!important;min-height:76px!important;display:flex!important;flex-direction:column!important;justify-content:center!important}.ocean-brand-sub{margin-top:6px!important}
   .side button{display:flex!important;align-items:center!important;gap:10px!important;min-height:42px!important;padding:9px 11px!important}.side button[data-v]::before,.side button[data-ops-manage]::before{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:6px;background:rgba(255,255,255,.07);font-size:12px;color:#a9c8dd;flex:0 0 20px}.side button[data-v="dashboard"]::before{content:'⌂'}.side button[data-v="orders"]::before{content:'▤'}.side button[data-v="bulkPrint"]::before{content:'▣'}.side button[data-v="new"]::before{content:'+'}.side button[data-v="contacts"]::before{content:'◎'}.side button[data-v="products"]::before{content:'◇'}.side button[data-v="sets"]::before{content:'⬡'}.side button[data-v="templates"]::before{content:'≡'}.side button[data-ops-manage]::before{content:'⚙'}
@@ -22,7 +22,7 @@
   document.head.appendChild(css);
 
   function cleanBrand(){
-    document.querySelectorAll('.ocean-brand-logo,.ocean-login-logo').forEach(img=>{if(img.dataset.uxLogo!=='10'){img.src='/ocean-logo.svg?v=10';img.removeAttribute('style');img.dataset.uxLogo='10'}});
+    document.querySelectorAll('.ocean-brand-logo,.ocean-login-logo,.ocean-top-logo').forEach(img=>{if(img.dataset.uxLogo!=='png1'){img.src='/ocean-logo.png?v=1';img.removeAttribute('style');img.dataset.uxLogo='png1'}});
     const topMuted=document.querySelector('.top .muted');if(topMuted&&!topMuted.dataset.ux){topMuted.innerHTML='';topMuted.dataset.ux='1'}
   }
   function addSectionHeads(){
