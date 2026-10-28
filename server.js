@@ -58,7 +58,7 @@ app.get('/api/orders',auth,async(req,res)=>{
  if(req.query.date){w.push(`o.order_date=$${i++}`);p.push(req.query.date)}
  if(req.query.from){w.push(`o.order_date>=$${i++}`);p.push(req.query.from)}
  if(req.query.to){w.push(`o.order_date<=$${i++}`);p.push(req.query.to)}
- const sql=`SELECT o.*,COALESCE(json_agg(json_build_object('item_code',oi.item_code,'item_name',oi.item_name,'qty',oi.qty)) FILTER (WHERE oi.id IS NOT NULL),'[]') items FROM orders o LEFT JOIN order_items oi ON oi.order_id=o.id ${w.length?'WHERE '+w.join(' AND '):''} GROUP BY o.id ORDER BY o.order_date DESC,o.id DESC`;
+ const sql=`SELECT o.*,COALESCE(json_agg(json_build_object('item_code',oi.item_code,'item_name',oi.item_name,'qty',oi.qty)) FILTER (WHERE oi.id IS NOT NULL),'[]') items FROM orders o LEFT JOIN order_items oi ON oi.order_id=o.id ${w.length?'WHERE '+w.join(' AND '):''} GROUP BY o.id ORDER BY o.created_at DESC,o.id DESC`;
  const q=await pool.query(sql,p);res.json(q.rows)
 });
 app.get('/api/orders/days',auth,async(req,res)=>{const q=await pool.query("SELECT order_date,COUNT(*)::int count FROM orders GROUP BY order_date ORDER BY order_date DESC LIMIT 60");res.json(q.rows)});
