@@ -22,8 +22,8 @@
   document.head.appendChild(css);
 
   function cleanBrand(){
-    document.querySelectorAll('.ocean-brand-logo,.ocean-login-logo').forEach(img=>{img.src='/ocean-logo.svg?v=7';img.removeAttribute('style')});
-    const topMuted=document.querySelector('.top .muted');if(topMuted){topMuted.innerHTML='';topMuted.dataset.ux='1'}
+    document.querySelectorAll('.ocean-brand-logo,.ocean-login-logo').forEach(img=>{if(img.dataset.uxLogo!=='7'){img.src='/ocean-logo.svg?v=7';img.removeAttribute('style');img.dataset.uxLogo='7'}});
+    const topMuted=document.querySelector('.top .muted');if(topMuted&&!topMuted.dataset.ux){topMuted.innerHTML='';topMuted.dataset.ux='1'}
   }
   function addSectionHeads(){
     const c=document.querySelector('#contacts .card.panel');
@@ -59,7 +59,9 @@
   window.loadTemplates=async function(){window.templates=templates=await apiX('/api/templates');const nt=$('nt');if(nt)nt.innerHTML='<option value="">Yok</option>'+templates.map(x=>`<option value="${esc(x.template_no)}">${esc(x.template_no)} - ${esc(x.title||'')}</option>`).join('');renderTemplates()};
   window.saveTemplate=async function(){const body={template_no:$('tn').value.trim(),title:$('tt').value.trim(),body:$('tb').value};if(!body.template_no||!body.body.trim())return notify('Şablon no ve metin gerekli');if(editTemplateId)await apiX('/api/templates/'+editTemplateId,{method:'PATCH',body:JSON.stringify(body)});else await apiX('/api/templates',{method:'POST',body:JSON.stringify(body)});notify(editTemplateId?'Yazı şablonu güncellendi':'Yazı şablonu eklendi');resetTemplate();await window.loadTemplates()};
 
-  function polish(){cleanBrand();addSectionHeads();ensureCancelButtons();if($('contactList')&&Array.isArray(window.contacts||contacts))renderContacts();if($('templateList')&&Array.isArray(window.templates||templates))renderTemplates()}
+  function polish(){cleanBrand();addSectionHeads();ensureCancelButtons()}
   polish();
-  new MutationObserver(polish).observe(document.body,{childList:true,subtree:true});
+  if($('contactList'))renderContacts();
+  if($('templateList'))renderTemplates();
+  new MutationObserver(()=>{cleanBrand();addSectionHeads();ensureCancelButtons()}).observe(document.body,{childList:true,subtree:true});
 })();
