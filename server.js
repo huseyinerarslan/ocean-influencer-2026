@@ -1,4 +1,5 @@
 'use strict';
+const fs=require('fs');
 const path=require('path');
 const express=require('express');
 const cookieParser=require('cookie-parser');
@@ -70,6 +71,15 @@ app.post('/api/orders/:id/dhl/create',auth,async(req,res)=>res.status(501).json(
 installImportRoutes(app,pool,auth);
 installEditRoutes(app,pool,auth);
 installCatalogRoutes(app,pool,auth);
-app.use(express.static(path.join(__dirname,'public')));
-app.get('*',(req,res)=>res.sendFile(path.join(__dirname,'public','index.html')));
+
+const publicDir=path.join(__dirname,'public');
+function sendApp(res){
+  const file=path.join(publicDir,'index.html');
+  const html=fs.readFileSync(file,'utf8').replace('</body>','<script src="/ux-overhaul.js?v=3"></script></body>');
+  res.type('html').send(html);
+}
+app.get('/',(req,res)=>sendApp(res));
+app.use(express.static(publicDir));
+app.get('*',(req,res)=>sendApp(res));
+
 schema().then(()=>app.listen(PORT,()=>console.log(`Ocean Influencer running on ${PORT}`))).catch(e=>{console.error(e);process.exit(1)});
