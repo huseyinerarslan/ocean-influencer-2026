@@ -22,7 +22,7 @@
   document.head.appendChild(css);
 
   function cleanBrand(){
-    document.querySelectorAll('.ocean-brand-logo,.ocean-login-logo').forEach(img=>{if(img.dataset.uxLogo!=='7'){img.src='/ocean-logo.svg?v=7';img.removeAttribute('style');img.dataset.uxLogo='7'}});
+    document.querySelectorAll('.ocean-brand-logo,.ocean-login-logo').forEach(img=>{if(img.dataset.uxLogo!=='10'){img.src='/ocean-logo.svg?v=10';img.removeAttribute('style');img.dataset.uxLogo='10'}});
     const topMuted=document.querySelector('.top .muted');if(topMuted&&!topMuted.dataset.ux){topMuted.innerHTML='';topMuted.dataset.ux='1'}
   }
   function addSectionHeads(){
