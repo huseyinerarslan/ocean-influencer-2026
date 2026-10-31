@@ -1,6 +1,9 @@
 (()=>{
   'use strict';
 
+  const norm=s=>String(s||'').trim().toLocaleLowerCase('tr-TR');
+  const esc=s=>String(s??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]));
+
   const css=document.createElement('style');
   css.id='dashboard-reports-style';
   css.textContent=`
@@ -14,7 +17,7 @@
       width:250px;height:36px;display:flex;align-items:center;gap:7px;
       padding:0 8px 0 10px;border:1px solid #d9e3ec;border-radius:10px;
       background:#fff;transition:border-color .16s ease,box-shadow .16s ease,transform .16s ease,background .16s ease;
-      position:relative
+      position:relative;z-index:45;overflow:visible
     }
     .pr-filterbar .pr-search-shell:focus-within{
       border-color:#4d94b8;background:#fbfdff;
@@ -37,13 +40,40 @@
     .pr-search-feedback{min-width:62px;font-size:10px;font-weight:750;color:#75879a;white-space:nowrap;transition:.15s ease}
     .pr-search-feedback.searching{color:#2f789f}
     .pr-search-feedback.found{color:#235f80}
-    @media(max-width:700px){.pr-filterbar .pr-search-shell{width:100%;flex:1 1 100%}.pr-search-feedback{min-width:auto}}
+
+    .pr-search-suggestions{
+      display:none;position:absolute;left:-1px;top:calc(100% + 8px);width:340px;max-height:330px;overflow:auto;
+      background:#fff;border:1px solid #dbe5ed;border-radius:12px;padding:6px;
+      box-shadow:0 18px 45px rgba(16,36,58,.18);z-index:10080
+    }
+    .pr-search-suggestions.show{display:block}
+    .pr-suggest-head{padding:7px 9px 5px;font-size:9px;font-weight:850;letter-spacing:.06em;text-transform:uppercase;color:#8a98a8}
+    .pr-suggest-item{width:100%;border:0;background:transparent;border-radius:9px;padding:8px 9px;display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:9px;align-items:center;text-align:left;cursor:pointer;color:#24394d}
+    .pr-suggest-item:hover,.pr-suggest-item.active{background:#edf5f9}
+    .pr-suggest-avatar{width:30px;height:30px;border-radius:9px;background:#e4eff5;color:#255f80;display:grid;place-items:center;font-size:10px;font-weight:900}
+    .pr-suggest-main{min-width:0}.pr-suggest-name{display:block;font-size:11px;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pr-suggest-meta{display:block;margin-top:2px;font-size:9px;color:#8391a0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .pr-suggest-count{font-size:9px;font-weight:800;color:#526b80;background:#f2f6f9;border-radius:999px;padding:4px 6px;white-space:nowrap}
+    .pr-suggest-empty{padding:12px 10px;font-size:10px;color:#8794a3;text-align:center}
+    #prInfluencers.pr-results-pulse{animation:prResultsPulse .75s ease}
+    @keyframes prResultsPulse{0%{filter:brightness(1)}35%{filter:brightness(.97);transform:translateY(-1px)}100%{filter:brightness(1);transform:none}}
+
+    @media(max-width:700px){
+      .pr-filterbar .pr-search-shell{width:100%;flex:1 1 100%}
+      .pr-search-feedback{min-width:auto}
+      .pr-search-suggestions{width:min(92vw,380px)}
+    }
   `;
   document.head.appendChild(css);
 
   let premiumShowReports=null;
   let baseGo=null;
   let searchTimer=null;
+  let jumpTimer=null;
+  let closeTimer=null;
+  let suggestionData=[];
+  let suggestions=[];
+  let suggestionPromise=null;
+  let activeSuggestion=-1;
 
   function reportsButton(){return document.querySelector('.side [data-v="reports"]')}
   function keepReportsOutOfMenu(){
@@ -85,6 +115,109 @@
     feedback.textContent=has?`${resultCount()} sonuç`:'İsimle ara';
   }
 
+  function initials(name){
+    return String(name||'?').split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join('').toLocaleUpperCase('tr-TR');
+  }
+
+  async function loadSuggestionData(){
+    if(suggestionData.length)return suggestionData;
+    if(suggestionPromise)return suggestionPromise;
+    suggestionPromise=(async()=>{
+      try{
+        const r=await fetch('/api/orders',{credentials:'same-origin'});
+        if(!r.ok)return [];
+        const orders=(await r.json()).filter(o=>o.status!=='ARCHIVED');
+        const map=new Map();
+        orders.forEach(o=>{
+          const name=String(o.recipient_name||'').trim();
+          if(!name)return;
+          const key=norm(name);
+          if(!map.has(key))map.set(key,{name,city:'',count:0,codes:new Set(),last:''});
+          const x=map.get(key);
+          x.count+=1;
+          if(o.city)x.city=String(o.city).trim();
+          const d=String(o.order_date||'');
+          if(d>x.last)x.last=d;
+          (o.items||[]).forEach(it=>{const code=String(it.item_code||'').trim();if(code)x.codes.add(code)});
+        });
+        suggestionData=[...map.values()].map(x=>({
+          ...x,
+          codes:[...x.codes],
+          haystack:norm([x.name,x.city,...x.codes].join(' '))
+        })).sort((a,b)=>b.count-a.count||a.name.localeCompare(b.name,'tr'));
+        return suggestionData;
+      }catch(e){
+        console.warn('Dashboard search suggestions failed',e);
+        return [];
+      }finally{suggestionPromise=null}
+    })();
+    return suggestionPromise;
+  }
+
+  function closeSuggestions(){
+    const box=document.getElementById('prSearchSuggestions');
+    if(box)box.classList.remove('show');
+    activeSuggestion=-1;
+  }
+
+  function paintActiveSuggestion(){
+    document.querySelectorAll('#prSearchSuggestions .pr-suggest-item').forEach((el,i)=>el.classList.toggle('active',i===activeSuggestion));
+    const active=document.querySelector('#prSearchSuggestions .pr-suggest-item.active');
+    active?.scrollIntoView({block:'nearest'});
+  }
+
+  function renderSuggestions(){
+    const input=document.getElementById('prSearch');
+    const box=document.getElementById('prSearchSuggestions');
+    if(!input||!box)return;
+    const q=norm(input.value);
+    if(!q){closeSuggestions();box.innerHTML='';return;}
+
+    suggestions=suggestionData
+      .filter(x=>x.haystack.includes(q))
+      .sort((a,b)=>{
+        const an=norm(a.name),bn=norm(b.name);
+        const as=an.startsWith(q)?0:1,bs=bn.startsWith(q)?0:1;
+        return as-bs||b.count-a.count||a.name.localeCompare(b.name,'tr');
+      })
+      .slice(0,8);
+    activeSuggestion=-1;
+
+    if(!suggestions.length){
+      box.innerHTML='<div class="pr-suggest-empty">Eşleşen influencer önerisi yok.</div>';
+      box.classList.add('show');
+      return;
+    }
+
+    box.innerHTML=`<div class="pr-suggest-head">Önerilen sonuçlar</div>${suggestions.map((x,i)=>`<button type="button" class="pr-suggest-item" data-index="${i}"><span class="pr-suggest-avatar">${esc(initials(x.name))}</span><span class="pr-suggest-main"><span class="pr-suggest-name">${esc(x.name)}</span><span class="pr-suggest-meta">${esc(x.city||'Şehir bilgisi yok')}${x.codes.length?` · ${esc(x.codes.slice(0,2).join(', '))}`:''}</span></span><span class="pr-suggest-count">${x.count} gönderim</span></button>`).join('')}`;
+    box.classList.add('show');
+    box.querySelectorAll('.pr-suggest-item').forEach(btn=>{
+      btn.addEventListener('mousedown',e=>e.preventDefault());
+      btn.addEventListener('click',()=>chooseSuggestion(Number(btn.dataset.index)));
+    });
+  }
+
+  function scrollToResults(){
+    const grid=document.getElementById('prInfluencers');
+    if(!grid)return;
+    const anchor=grid.previousElementSibling||grid;
+    anchor.scrollIntoView({behavior:'smooth',block:'start'});
+    grid.classList.remove('pr-results-pulse');
+    void grid.offsetWidth;
+    grid.classList.add('pr-results-pulse');
+    setTimeout(()=>grid.classList.remove('pr-results-pulse'),850);
+  }
+
+  function chooseSuggestion(index){
+    const item=suggestions[index];
+    const input=document.getElementById('prSearch');
+    if(!item||!input)return;
+    input.value=item.name;
+    input.dispatchEvent(new Event('input',{bubbles:true}));
+    closeSuggestions();
+    setTimeout(()=>{updateSearchFeedback(false);scrollToResults()},120);
+  }
+
   function enhanceSearch(){
     const input=document.getElementById('prSearch');
     if(!input||input.dataset.searchUx==='1')return;
@@ -98,21 +231,56 @@
     icon.setAttribute('aria-hidden','true');
     const clear=document.createElement('button');
     clear.type='button';clear.className='pr-search-clear';clear.title='Aramayı temizle';clear.textContent='×';
+    const dropdown=document.createElement('div');
+    dropdown.id='prSearchSuggestions';dropdown.className='pr-search-suggestions';
     input.parentNode.insertBefore(wrap,input);
-    wrap.appendChild(icon);wrap.appendChild(input);wrap.appendChild(clear);
+    wrap.appendChild(icon);wrap.appendChild(input);wrap.appendChild(clear);wrap.appendChild(dropdown);
 
     const feedback=document.createElement('span');
     feedback.id='prSearchFeedback';feedback.className='pr-search-feedback';feedback.textContent='İsimle ara';
     wrap.insertAdjacentElement('afterend',feedback);
 
-    input.addEventListener('input',()=>{
+    loadSuggestionData();
+
+    input.addEventListener('focus',async()=>{
+      clearTimeout(closeTimer);
+      await loadSuggestionData();
+      renderSuggestions();
+    });
+    input.addEventListener('blur',()=>{
+      closeTimer=setTimeout(closeSuggestions,150);
+    });
+    input.addEventListener('input',async()=>{
       updateSearchFeedback(true);
+      await loadSuggestionData();
+      renderSuggestions();
       clearTimeout(searchTimer);
-      searchTimer=setTimeout(()=>updateSearchFeedback(false),120);
+      searchTimer=setTimeout(()=>updateSearchFeedback(false),140);
+      clearTimeout(jumpTimer);
+      if(input.value.trim().length>=2){
+        jumpTimer=setTimeout(()=>{
+          if(resultCount()>0)scrollToResults();
+        },520);
+      }
+    });
+    input.addEventListener('keydown',e=>{
+      const box=document.getElementById('prSearchSuggestions');
+      const open=box?.classList.contains('show')&&suggestions.length;
+      if(e.key==='ArrowDown'&&open){e.preventDefault();activeSuggestion=Math.min(activeSuggestion+1,suggestions.length-1);paintActiveSuggestion();return;}
+      if(e.key==='ArrowUp'&&open){e.preventDefault();activeSuggestion=Math.max(activeSuggestion-1,0);paintActiveSuggestion();return;}
+      if(e.key==='Enter'){
+        e.preventDefault();
+        if(open&&activeSuggestion>=0){chooseSuggestion(activeSuggestion);return;}
+        closeSuggestions();
+        setTimeout(()=>{updateSearchFeedback(false);scrollToResults()},80);
+        return;
+      }
+      if(e.key==='Escape')closeSuggestions();
     });
     clear.addEventListener('click',()=>{
       input.value='';
       input.dispatchEvent(new Event('input',{bubbles:true}));
+      closeSuggestions();
       input.focus();
     });
     updateSearchFeedback(false);
