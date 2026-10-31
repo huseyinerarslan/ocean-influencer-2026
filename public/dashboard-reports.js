@@ -41,7 +41,6 @@
   `;
   document.head.appendChild(css);
 
-  let mounted=false;
   let premiumShowReports=null;
   let baseGo=null;
   let searchTimer=null;
@@ -61,7 +60,6 @@
     dashboard.classList.add('dashboard-intelligence');
     if(shell.parentElement!==dashboard)dashboard.appendChild(shell);
     reports?.classList.remove('active');
-    mounted=true;
     enhanceSearch();
     keepReportsOutOfMenu();
     return true;
@@ -107,8 +105,6 @@
     feedback.id='prSearchFeedback';feedback.className='pr-search-feedback';feedback.textContent='İsimle ara';
     wrap.insertAdjacentElement('afterend',feedback);
 
-    input.addEventListener('focus',()=>wrap.classList.add('is-focus'));
-    input.addEventListener('blur',()=>wrap.classList.remove('is-focus'));
     input.addEventListener('input',()=>{
       updateSearchFeedback(true);
       clearTimeout(searchTimer);
@@ -123,6 +119,8 @@
   }
 
   async function openDashboardReports(){
+    const app=document.getElementById('app');
+    if(!app||app.classList.contains('hidden'))return;
     keepReportsOutOfMenu();
     if(typeof premiumShowReports==='function'){
       await premiumShowReports();
@@ -136,6 +134,12 @@
     if(title)title.textContent='Dashboard';
     keepReportsOutOfMenu();
     updateSearchFeedback(false);
+  }
+
+  function waitForLogin(){
+    const app=document.getElementById('app');
+    if(!app||app.classList.contains('hidden')){setTimeout(waitForLogin,120);return;}
+    openDashboardReports();
   }
 
   function boot(){
@@ -152,10 +156,8 @@
     };
 
     const side=document.querySelector('.side');
-    if(side){
-      new MutationObserver(()=>keepReportsOutOfMenu()).observe(side,{childList:true,subtree:true});
-    }
-    openDashboardReports();
+    if(side)new MutationObserver(()=>keepReportsOutOfMenu()).observe(side,{childList:true,subtree:true});
+    waitForLogin();
   }
 
   boot();
