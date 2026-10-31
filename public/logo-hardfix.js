@@ -1,7 +1,7 @@
 (()=>{
   'use strict';
-  const B64='/ocean-logo-correct.b64?v=1';
-  let LOGO_DATA='';
+  const B64='/ocean-logo-correct.b64?v=2';
+  let LOGO_URL='';
 
   const old=document.getElementById('ocean-logo-hardfix');
   if(old)old.remove();
@@ -42,23 +42,31 @@
       const h=login.querySelector('h1');
       login.insertBefore(box,h||login.firstChild);
     }
-    if(LOGO_DATA) applyLogo();
+    applyLogo();
   }
 
   function applyLogo(){
+    if(!LOGO_URL)return;
     document.querySelectorAll('.ocean-stable-logo,.ocean-login-stable-logo').forEach(img=>{
-      if(img.src!==LOGO_DATA) img.src=LOGO_DATA;
+      if(img.src!==LOGO_URL)img.src=LOGO_URL;
     });
   }
 
   async function loadLogo(){
     try{
       const r=await fetch(B64,{cache:'no-store'});
-      if(!r.ok) throw new Error('Logo kaynağı yüklenemedi');
-      const b64=(await r.text()).trim();
-      LOGO_DATA='data:image/png;base64,'+b64;
+      if(!r.ok)throw new Error('Logo kaynağı yüklenemedi');
+      const b64=(await r.text()).replace(/\s+/g,'');
+      const raw=atob(b64);
+      const bytes=new Uint8Array(raw.length);
+      for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
+      const blob=new Blob([bytes],{type:'image/png'});
+      if(LOGO_URL)URL.revokeObjectURL(LOGO_URL);
+      LOGO_URL=URL.createObjectURL(blob);
       applyLogo();
-    }catch(e){console.error('Ocean logo error:',e)}
+    }catch(e){
+      console.error('Ocean logo error:',e);
+    }
   }
 
   lockBrand();
