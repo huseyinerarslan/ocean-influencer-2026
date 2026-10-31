@@ -1,0 +1,1 @@
+The sidebar brand is owned by brand-lock.js. Legacy scripts must not modify .brand-final.
