@@ -1,6 +1,6 @@
 (()=>{
   'use strict';
-  const LOGO='/ocean-logo.png?v=12';
+  const LOGO='/ocean-logo-final.png?v=1';
 
   const css=document.createElement('style');
   css.id='ocean-sidebar-final-style';
@@ -11,13 +11,13 @@
         min-height:100vh!important;
         max-height:100vh!important;
         overflow:hidden!important;
-        padding:8px 10px!important;
+        padding:7px 10px!important;
         box-sizing:border-box!important;
         gap:0!important;
       }
       .brand{
         min-height:0!important;height:auto!important;max-height:none!important;
-        margin:0 3px 6px!important;padding:3px 5px 7px!important;
+        margin:0 3px 5px!important;padding:2px 5px 6px!important;
         border-bottom:1px solid rgba(255,255,255,.10)!important;
         overflow:visible!important;display:flex!important;flex-direction:column!important;
         align-items:center!important;justify-content:flex-start!important
@@ -30,7 +30,7 @@
       }
       .brand img.ocean-stable-logo{
         display:block!important;width:100%!important;height:auto!important;max-width:100%!important;
-        max-height:50px!important;object-fit:contain!important;object-position:center!important;
+        max-height:48px!important;object-fit:contain!important;object-position:center!important;
         margin:0!important;padding:0!important;border:0!important;filter:none!important;
         clip-path:none!important;opacity:1!important;visibility:visible!important
       }
@@ -40,7 +40,7 @@
         font-weight:800!important;text-align:center!important
       }
       .side button{
-        min-height:33px!important;height:33px!important;padding:4px 8px!important;margin:0!important;
+        min-height:32px!important;height:32px!important;padding:4px 8px!important;margin:0!important;
         border-radius:8px!important;font-size:11.5px!important;line-height:1!important
       }
       .side button + button{margin-top:1px!important}
@@ -48,9 +48,9 @@
         width:17px!important;height:17px!important;min-width:17px!important;flex-basis:17px!important;
         font-size:9px!important;border-radius:5px!important;margin-right:7px!important
       }
-      .side hr,.side .nav-separator{margin:4px!important}
+      .side hr,.side .nav-separator{margin:3px 4px!important}
       .side .section-label,.side .nav-label,.side .menu-label,.side small,.side .muted{
-        margin:3px 7px 2px!important;line-height:1!important
+        margin:2px 7px 1px!important;line-height:1!important
       }
     }
     .ocean-login-stable-box{
@@ -73,7 +73,7 @@
         brand.innerHTML=`<div class="ocean-stable-logo-box"><img class="ocean-stable-logo" src="${LOGO}" alt="Ocean Home Textile"></div><span class="ocean-stable-sub">Influencer Operasyon</span>`;
       }else{
         const img=box.querySelector('img');
-        if(img && !img.src.includes('/ocean-logo.png')) img.src=LOGO;
+        if(img && !img.src.includes('/ocean-logo-final.png')) img.src=LOGO;
       }
     }
 
