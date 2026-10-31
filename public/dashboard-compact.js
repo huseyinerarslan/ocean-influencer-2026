@@ -3,6 +3,30 @@
   const css=document.createElement('style');
   css.id='dashboard-compact-kpis';
   css.textContent=`
+    /* Dashboard ana blokları birbirine yapışmasın */
+    #dashboard .pr-shell{
+      display:flex!important;
+      flex-direction:column!important;
+      gap:18px!important;
+    }
+    #dashboard .pr-topbar,
+    #dashboard .pr-kpis,
+    #dashboard .pr-grid,
+    #dashboard .pr-insights,
+    #dashboard .pr-section-head,
+    #dashboard .pr-influencers{
+      margin-top:0!important;
+      margin-bottom:0!important;
+    }
+    #dashboard .pr-grid{
+      width:100%!important;
+      align-items:stretch!important;
+    }
+    #dashboard .pr-panel{
+      margin:0!important;
+    }
+
+    /* Kompakt KPI şeridi */
     #dashboard .pr-kpis{gap:8px!important}
     #dashboard .pr-kpi{
       min-height:72px!important;
@@ -34,10 +58,13 @@
       line-height:1.05!important;
       margin-top:3px!important;
     }
+
     @media(max-width:1250px){
+      #dashboard .pr-shell{gap:16px!important}
       #dashboard .pr-kpi{min-height:68px!important}
     }
     @media(max-width:700px){
+      #dashboard .pr-shell{gap:14px!important}
       #dashboard .pr-kpi{min-height:64px!important;padding:8px 10px!important}
       #dashboard .pr-kpi-value{font-size:18px!important}
     }
