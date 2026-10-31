@@ -1,44 +1,70 @@
 (()=>{
-  const LOGO='/ocean-logo.png?v=10';
+  const LOGO='/ocean-logo.png?v=11';
   const css=document.createElement('style');
   css.id='ocean-logo-hardfix';
   css.textContent=`
-    .brand{min-height:124px!important;height:auto!important;max-height:none!important;overflow:visible!important;padding:8px 8px 18px!important;display:flex!important;flex-direction:column!important;align-items:flex-start!important;justify-content:center!important}
-    .brand .ocean-brand-logo.ocean-brand-mark{display:block!important;width:208px!important;height:55px!important;min-width:208px!important;min-height:55px!important;max-width:208px!important;max-height:55px!important;margin:0!important;padding:0!important;overflow:visible!important;clip-path:none!important;filter:none!important;background:#fff!important;-webkit-mask-image:url('${LOGO}')!important;mask-image:url('${LOGO}')!important;-webkit-mask-repeat:no-repeat!important;mask-repeat:no-repeat!important;-webkit-mask-position:left center!important;mask-position:left center!important;-webkit-mask-size:contain!important;mask-size:contain!important}
-    .brand .ocean-brand-sub{display:block!important;margin:10px 0 0 1px!important;color:#a9bfd1!important;font-size:10px!important;line-height:1.2!important;letter-spacing:.11em!important;text-transform:uppercase!important;font-weight:750!important}
-    .login .ocean-login-logo.ocean-login-mark{display:block!important;width:300px!important;height:79px!important;max-width:100%!important;max-height:79px!important;margin:0 auto 20px!important;padding:0!important;clip-path:none!important;filter:none!important;background-image:url('${LOGO}')!important;background-repeat:no-repeat!important;background-position:center!important;background-size:contain!important}
-    @media(max-width:900px){.login .ocean-login-logo.ocean-login-mark{width:250px!important;height:66px!important}}
+    .brand{
+      min-height:126px!important;height:auto!important;max-height:none!important;
+      overflow:visible!important;padding:8px 8px 18px!important;
+      display:flex!important;flex-direction:column!important;align-items:center!important;
+      justify-content:center!important
+    }
+    .brand .ocean-final-logo-box{
+      width:214px!important;max-width:100%!important;
+      background:#fff!important;border-radius:10px!important;
+      padding:8px 10px!important;box-sizing:border-box!important;
+      display:flex!important;align-items:center!important;justify-content:center!important;
+      overflow:visible!important;box-shadow:0 8px 24px rgba(0,0,0,.10)!important
+    }
+    .brand img.ocean-brand-logo.ocean-final-logo{
+      display:block!important;width:100%!important;height:auto!important;
+      min-width:0!important;min-height:0!important;max-width:100%!important;max-height:none!important;
+      object-fit:contain!important;object-position:center!important;
+      margin:0!important;padding:0!important;border:0!important;
+      filter:none!important;clip-path:none!important;opacity:1!important;
+      visibility:visible!important;background:transparent!important
+    }
+    .brand .ocean-brand-sub{
+      display:block!important;margin:10px 0 0!important;color:#a9bfd1!important;
+      font-size:10px!important;line-height:1.2!important;letter-spacing:.11em!important;
+      text-transform:uppercase!important;font-weight:750!important;text-align:center!important
+    }
+    .login .ocean-final-login-box{
+      width:min(310px,100%)!important;margin:0 auto 20px!important;
+      display:flex!important;align-items:center!important;justify-content:center!important
+    }
+    .login img.ocean-login-logo.ocean-final-login{
+      display:block!important;width:100%!important;height:auto!important;
+      max-width:100%!important;max-height:none!important;object-fit:contain!important;
+      margin:0!important;padding:0!important;filter:none!important;clip-path:none!important;
+      opacity:1!important;visibility:visible!important;background:transparent!important
+    }
+    @media(max-width:900px){
+      .brand .ocean-final-logo-box{width:200px!important}
+      .login .ocean-final-login-box{width:min(270px,100%)!important}
+    }
   `;
   document.head.appendChild(css);
 
   function hardFixLogo(){
     const brand=document.querySelector('.brand');
-    if(brand){
-      let mark=brand.querySelector('.ocean-brand-mark');
-      if(!mark){
-        const old=brand.querySelector('.ocean-brand-logo');
-        mark=document.createElement('div');
-        mark.className='ocean-brand-logo ocean-brand-mark';
-        mark.setAttribute('role','img');
-        mark.setAttribute('aria-label','Ocean Home Textile');
-        if(old) old.replaceWith(mark); else brand.prepend(mark);
-      }
-      let sub=brand.querySelector('.ocean-brand-sub');
-      if(!sub){sub=document.createElement('span');sub.className='ocean-brand-sub';sub.textContent='Influencer Operasyon';brand.appendChild(sub)}
+    if(brand&&!brand.querySelector('.ocean-final-logo-box')){
+      brand.innerHTML=`<div class="ocean-final-logo-box"><img class="ocean-brand-logo ocean-final-logo" src="${LOGO}" alt="Ocean Home Textile"></div><span class="ocean-brand-sub">Influencer Operasyon</span>`;
     }
+    const brandImg=brand?.querySelector('.ocean-final-logo');
+    if(brandImg){brandImg.src=LOGO;brandImg.removeAttribute('width');brandImg.removeAttribute('height');}
 
     const login=document.querySelector('.login .card');
-    if(login){
-      let mark=login.querySelector('.ocean-login-mark');
-      if(!mark){
-        const old=login.querySelector('.ocean-login-logo');
-        mark=document.createElement('div');
-        mark.className='ocean-login-logo ocean-login-mark';
-        mark.setAttribute('role','img');
-        mark.setAttribute('aria-label','Ocean Home Textile');
-        if(old) old.replaceWith(mark); else login.prepend(mark);
-      }
+    if(login&&!login.querySelector('.ocean-final-login-box')){
+      login.querySelectorAll('.ocean-login-logo,.ocean-login-mark').forEach(x=>x.remove());
+      const box=document.createElement('div');
+      box.className='ocean-final-login-box';
+      box.innerHTML=`<img class="ocean-login-logo ocean-final-login" src="${LOGO}" alt="Ocean Home Textile">`;
+      const h=login.querySelector('h1');
+      login.insertBefore(box,h||login.firstChild);
     }
+    const loginImg=login?.querySelector('.ocean-final-login');
+    if(loginImg){loginImg.src=LOGO;loginImg.removeAttribute('width');loginImg.removeAttribute('height');}
   }
 
   hardFixLogo();
