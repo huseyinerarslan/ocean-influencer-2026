@@ -75,7 +75,7 @@ installCatalogRoutes(app,pool,auth);
 const publicDir=path.join(__dirname,'public');
 function sendApp(res){
   const file=path.join(publicDir,'index.html');
-  const html=fs.readFileSync(file,'utf8').replace('</body>','<script src="/ux-overhaul.js?v=4"></script><script src="/archive-enhancements.js?v=1"></script><script src="/reports-enhancements.js?v=2"></script><script src="/premium-shell.js?v=1"></script></body>');
+  const html=fs.readFileSync(file,'utf8').replace('</body>','<script src="/ux-overhaul.js?v=4"></script><script src="/archive-enhancements.js?v=1"></script><script src="/reports-enhancements.js?v=2"></script><script src="/premium-shell.js?v=1"></script><script src="/logo-hardfix.js?v=1"></script></body>');
   res.type('html').send(html);
 }
 app.get('/',(req,res)=>sendApp(res));
