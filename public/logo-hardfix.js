@@ -1,6 +1,6 @@
 (()=>{
   'use strict';
-  const LOGO='/ocean-logo-final.png?v=3';
+  const LOGO='/ocean-logo-final.png?v=4';
   const old=document.getElementById('ocean-logo-hardfix');
   if(old)old.remove();
   const css=document.createElement('style');
