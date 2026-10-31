@@ -1,5 +1,5 @@
 (()=>{
-  const LOGO='/ocean-logo.png?v=9';
+  const LOGO='/ocean-logo.png?v=10';
   const css=document.createElement('style');
   css.id='ocean-logo-hardfix';
   css.textContent=`
