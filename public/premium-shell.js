@@ -43,6 +43,8 @@
       font-weight:800;
     }
     .side button{
+      display:flex;
+      align-items:center;
       min-height:30px;
       height:30px;
       padding:4px 8px;
@@ -59,10 +61,21 @@
     .side button:hover{background:rgba(255,255,255,.065);color:#fff;transform:translateX(1px)}
     .side button.active{background:linear-gradient(90deg,rgba(55,122,168,.29),rgba(55,122,168,.13));color:#fff;box-shadow:inset 2px 0 0 #78b8df}
     .side button[data-v]::before,.side button[data-ops-manage]::before{
+      display:inline-grid;place-items:center;
       width:16px;height:16px;min-width:16px;flex-basis:16px;
       border-radius:5px;font-size:8px;margin-right:6px;
       background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.055)
     }
+    .side button[data-v="dashboard"]::before{content:'⌂'}
+    .side button[data-v="orders"]::before{content:'▤'}
+    .side button[data-v="archive"]::before{content:'▱'}
+    .side button[data-v="bulkprint"]::before{content:'▣'}
+    .side button[data-v="new"]::before{content:'+'}
+    .side button[data-v="contacts"]::before{content:'◎'}
+    .side button[data-v="products"]::before{content:'◇'}
+    .side button[data-v="sets"]::before{content:'⬡'}
+    .side button[data-v="templates"]::before{content:'≡'}
+    .side button[data-ops-manage]::before{content:'⚙'}
     .side hr,.side .nav-separator{margin:3px 4px}
     .side .section-label,.side .nav-label,.side .menu-label,.side small,.side .muted{margin:2px 7px;line-height:1}
 
