@@ -1,6 +1,6 @@
 (()=>{
   const el=id=>document.getElementById(id);
-  const esc=s=>String(s??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]));
+  const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const selected=new Set();let bulkOrders=[];
   const isImported=o=>/^EXCEL-/i.test(String(o?.order_no||''));
   const displayName=o=>isImported(o)?(o.recipient_name||'Influencer'):(o.recipient_name||o.order_no||'Sipariş');
@@ -42,9 +42,4 @@
   }
 
   ensureMenuAndView();
-
-  const hotfix=document.createElement('script');
-  hotfix.src='/mobile-hotfix.js?v=20261027-1900';
-  hotfix.defer=true;
-  document.head.appendChild(hotfix);
 })();
