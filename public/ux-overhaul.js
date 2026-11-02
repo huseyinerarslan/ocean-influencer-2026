@@ -26,9 +26,13 @@
     .ux-head p{margin:0;color:#718096;font-size:13px}
     .ux-search{display:flex;gap:8px;align-items:center}
     .ux-search input{min-width:250px;border:1px solid #d4dee8;border-radius:9px;padding:9px 11px;background:#fff}
-    .ux-list{display:grid;gap:8px;margin-top:14px}
-    .ux-row{display:grid;grid-template-columns:minmax(190px,.9fr) minmax(220px,1.3fr) minmax(150px,.8fr) auto;gap:12px;align-items:center;padding:12px 13px;border:1px solid #e4eaf0;border-radius:11px;background:#fff;transition:.14s ease}
-    .ux-row:hover{border-color:#b8cddd;box-shadow:0 5px 16px rgba(16,36,58,.055)}
+    .ux-list{display:grid;gap:10px;margin-top:14px}
+    .ux-contact-group{border:1px solid #e4eaf0;border-radius:12px;background:#fff;padding:12px 13px}
+    .ux-contact-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px}
+    .ux-contact-count{font-size:10px;font-weight:800;color:#526b80;background:#f2f6f9;border-radius:999px;padding:4px 7px}
+    .ux-row{display:grid;grid-template-columns:minmax(190px,.9fr) minmax(220px,1.3fr) minmax(150px,.8fr) auto;gap:12px;align-items:center;padding:10px 0;border-top:1px solid #edf1f5;background:#fff;transition:.14s ease}
+    .ux-contact-group .ux-row:first-of-type{border-top:0}
+    .ux-row:hover{background:#fbfdff}
     .ux-name{font-weight:800;color:#17283d}
     .ux-sub{font-size:12px;color:#718096;margin-top:2px}
     .ux-address{font-size:13px;color:#405267;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -44,6 +48,7 @@
       .ux-head{flex-direction:column}
       .ux-search{width:100%}
       .ux-search input{min-width:0;width:100%}
+      .ux-contact-head{align-items:flex-start}
       .ux-row{grid-template-columns:1fr}
       .ux-actions{justify-content:flex-start}
     }
@@ -131,6 +136,16 @@
     document.querySelector('#templates .formgrid')?.classList.remove('ux-editing');
   }
 
+  function groupContacts(rows){
+    const groups=new Map();
+    rows.forEach(x=>{
+      const key=String(x.name||'').trim().toLocaleLowerCase('tr-TR').replace(/\s+/g,' ');
+      if(!groups.has(key))groups.set(key,{name:x.name||'İsimsiz',rows:[]});
+      groups.get(key).rows.push(x);
+    });
+    return [...groups.values()].sort((a,b)=>a.name.localeCompare(b.name,'tr'));
+  }
+
   function renderContacts(){
     const list=$('contactList');
     if(!list)return;
@@ -140,21 +155,27 @@
         .toLocaleLowerCase('tr-TR')
         .includes(contactQuery)
     );
+    const groups=groupContacts(rows);
 
     list.className='ux-list';
-    list.innerHTML=rows.length?rows.map(x=>`
-      <div class="ux-row">
-        <div>
-          <div class="ux-name">${esc(x.name)}</div>
-          <div class="ux-sub">${esc(x.phone||'Telefon yok')}</div>
+    list.innerHTML=groups.length?groups.map(group=>`
+      <section class="ux-contact-group">
+        <div class="ux-contact-head">
+          <div class="ux-name">${esc(group.name)}</div>
+          ${group.rows.length>1?`<span class="ux-contact-count">${group.rows.length} kayıt</span>`:''}
         </div>
-        <div>
-          <div class="ux-address" title="${esc(x.address||'')}">${esc(x.address||'Adres yok')}</div>
-          <div class="ux-sub">${esc(x.city||'')}${x.district?' / '+esc(x.district):''}${x.postal_code?' · '+esc(x.postal_code):''}</div>
-        </div>
-        <div><span class="ux-pill">Adres #${x.id}</span></div>
-        <div class="ux-actions"><button class="btn" onclick="uxEditContact(${x.id})">Düzenle</button></div>
-      </div>
+        ${group.rows.map(x=>`
+          <div class="ux-row">
+            <div><div class="ux-sub">${esc(x.phone||'Telefon yok')}</div></div>
+            <div>
+              <div class="ux-address" title="${esc(x.address||'')}">${esc(x.address||'Adres yok')}</div>
+              <div class="ux-sub">${esc(x.city||'')}${x.district?' / '+esc(x.district):''}${x.postal_code?' · '+esc(x.postal_code):''}</div>
+            </div>
+            <div><span class="ux-pill">Adres #${x.id}</span></div>
+            <div class="ux-actions"><button class="btn" onclick="uxEditContact(${x.id})">Düzenle</button></div>
+          </div>
+        `).join('')}
+      </section>
     `).join(''):'<div class="ux-empty">Eşleşen kişi/adres bulunamadı.</div>';
   }
 
