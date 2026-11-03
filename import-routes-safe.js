@@ -27,7 +27,10 @@ function extractContacts(wb){
     const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
     for(let i=1;i<data.length;i++){
       const r=data[i]||[]; const name=clean(r[0]); if(!name)continue;
-      rows.push({name,district:clean(r[1]),city:clean(r[2]),address:clean(r[3]),postal_code:clean(r[4]),phone:phone(r[5])});
+      const headers=data[0].map(norm);
+      const tel=headers.findIndex(h=>h.includes('telefon'));
+      const postal=headers.findIndex(h=>h.includes('posta'));
+      rows.push({name,district:clean(r[1]),city:clean(r[2]),address:clean(r[3]),postal_code:clean(r[postal]),phone:phone(r[tel])});
     }
   }
   return rows;
@@ -44,7 +47,7 @@ function extractOrders(wb){
     if(!seq||!name)continue;
     const base=[seq,norm(name),norm(r[9]),phone(r[10])].join('|');
     if(!current||current.base!==base){
-      current={base,seq,name,district:clean(r[7]),city:clean(r[8]),address:clean(r[9]),phone:phone(r[10]),template:clean(r[11]),waybill:clean(r[12]),excel_status:clean(r[13]),postal_code:clean(r[14]),order_date:excelDate(r[15]),items:[]};
+      current={base,seq,name,transfer:clean(r[1]),district:clean(r[7]),city:clean(r[8]),address:clean(r[9]),phone:phone(r[10]),template:clean(r[11]),waybill:clean(r[12]),excel_status:clean(r[13]),postal_code:clean(r[14]),order_date:excelDate(r[15]),items:[]};
       groups.push(current);
     }
     const itemCode=clean(r[3]);
@@ -67,6 +70,11 @@ function installImportRoutes(app,pool,auth){
       const wb=XLSX.read(req.file.buffer,{type:'buffer',cellDates:true});
       const contacts=extractContacts(wb);
       const orders=extractOrders(wb);
+      // An optional change list limits the transaction to verified spreadsheet differences.
+      const changeSheet=wb.Sheets['Güncelleme Listesi'];
+      const changes=changeSheet && new Map(XLSX.utils.sheet_to_json(changeSheet,{header:1}).slice(1).map(r=>[clean(r[0]),{action:clean(r[1]),previousName:clean(r[2])}]));
+      if(changes && (changes.size!==orders.length || orders.some(o=>!changes.has(o.order_no))))return res.status(400).send('Güncelleme listesi siparişlerle uyuşmuyor.');
+      const skipped=[], conflicts=[];
       const c=await pool.connect();
       let contactsAdded=0,contactsSkipped=0,ordersAdded=0,ordersUpdated=0,itemCount=0,productCount=0;
       try{
@@ -76,6 +84,10 @@ function installImportRoutes(app,pool,auth){
         await c.query('ALTER TABLE orders ALTER COLUMN order_date DROP NOT NULL');
         await c.query('CREATE UNIQUE INDEX IF NOT EXISTS orders_source_ref_uq ON orders(source_ref) WHERE source_ref IS NOT NULL');
 
+        if(changes){
+          await c.query('LOCK TABLE orders IN SHARE ROW EXCLUSIVE MODE');
+          await c.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS stock_transfer_no TEXT');
+        }
         const existing=(await c.query('SELECT id,name,address FROM contacts')).rows;
         const contactMap=new Map(existing.map(x=>[norm(x.name)+'|'+norm(x.address),x.id]));
         for(const x of contacts){
@@ -86,6 +98,31 @@ function installImportRoutes(app,pool,auth){
         }
 
         for(const o of orders){
+          if(changes){
+            const change=changes.get(o.order_no);
+            const found=await c.query(`SELECT id,order_no,source_ref,recipient_name,address,stock_transfer_no FROM orders WHERE order_no=$1 OR source_ref=$2 OR left(order_no,length($1)+1)=$1||'-'`,[o.order_no,o.source_ref]);
+            const order=found.rows[0];
+            if(found.rowCount>1){conflicts.push(o.seq);continue}
+            if(change.action==='ekle'){
+              if(order){(order.source_ref===o.source_ref?skipped:conflicts).push(o.seq);continue}
+              const similar=await c.query('SELECT 1 FROM orders WHERE source_ref IS NULL AND lower(trim(recipient_name))=lower(trim($1)) AND (address=$2 OR phone=$3) LIMIT 1',[o.name,o.address,o.phone]);
+              if(similar.rowCount){conflicts.push(o.seq);continue}
+            }else{
+              if(!order || order.order_no!==o.order_no || !order.source_ref || norm(order.address)!==norm(o.address)){
+                conflicts.push(o.seq);continue
+              }
+              if(change.action==='nakil' && norm(order.recipient_name)===norm(o.name) && o.transfer){
+                if(order.stock_transfer_no===o.transfer){skipped.push(o.seq);continue}
+                if(order.stock_transfer_no){conflicts.push(o.seq);continue}
+                await c.query('UPDATE orders SET stock_transfer_no=$1,updated_at=NOW() WHERE id=$2',[o.transfer,order.id]);
+              }else if(change.action==='isim' && change.previousName){
+                if(order.recipient_name===o.name){skipped.push(o.seq);continue}
+                if(norm(order.recipient_name)!==norm(change.previousName)){conflicts.push(o.seq);continue}
+                await c.query('UPDATE orders SET recipient_name=$1,source_ref=$2,updated_at=NOW() WHERE id=$3',[o.name,o.source_ref,order.id]);
+              }else{conflicts.push(o.seq);continue}
+              ordersUpdated++;continue
+            }
+          }
           const contactKey=norm(o.name)+'|'+norm(o.address);
           let contactId=contactMap.get(contactKey)||null;
           if(!contactId){
@@ -106,10 +143,11 @@ function installImportRoutes(app,pool,auth){
             if(noExists.rowCount)orderNo=`${orderNo}-${o.source_ref.slice(-6)}`;
             const q=await c.query(`INSERT INTO orders(order_no,contact_id,recipient_name,phone,city,district,postal_code,address,letter_template_no,status,waybill_done,waybill_no,order_date,source_ref,source_status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'Çıkarıldı',$10,$11,$12,$13,$14) RETURNING id`,[orderNo,contactId,o.name,o.phone,o.city,o.district,o.postal_code,o.address,o.template,Boolean(o.waybill),o.waybill||null,o.order_date,o.source_ref,o.excel_status||null]);
             orderId=q.rows[0].id;ordersAdded++;
+            if(changes && o.transfer)await c.query('UPDATE orders SET stock_transfer_no=$1 WHERE id=$2',[o.transfer,orderId]);
           }
 
           for(const it of o.items){
-            await c.query(`INSERT INTO products(item_code,item_name) VALUES($1,$2) ON CONFLICT(item_code) DO UPDATE SET item_name=CASE WHEN EXCLUDED.item_name<>'' THEN EXCLUDED.item_name ELSE products.item_name END,updated_at=NOW()`,[it.item_code,it.item_name||it.item_code]);
+            await c.query(changes ? 'INSERT INTO products(item_code,item_name) VALUES($1,$2) ON CONFLICT(item_code) DO NOTHING' : `INSERT INTO products(item_code,item_name) VALUES($1,$2) ON CONFLICT(item_code) DO UPDATE SET item_name=CASE WHEN EXCLUDED.item_name<>'' THEN EXCLUDED.item_name ELSE products.item_name END,updated_at=NOW()`,[it.item_code,it.item_name||it.item_code]);
             await c.query('INSERT INTO order_items(order_id,item_code,item_name,qty) VALUES($1,$2,$3,$4)',[orderId,it.item_code,it.item_name||it.item_code,it.qty]);
             itemCount++;productCount++;
           }
@@ -117,7 +155,7 @@ function installImportRoutes(app,pool,auth){
         await c.query('COMMIT');
       }catch(e){await c.query('ROLLBACK');throw e}finally{c.release()}
 
-      res.type('html').send(`<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Aktarım Tamamlandı</title></head><body style="font-family:system-ui;padding:22px"><h1>Aktarım tamamlandı</h1><p><b>${contactsAdded}</b> yeni kişi/adres eklendi, <b>${contactsSkipped}</b> kişi zaten vardı.</p><p><b>${ordersAdded}</b> geçmiş sipariş eklendi, <b>${ordersUpdated}</b> sipariş güncellendi.</p><p><b>${itemCount}</b> ürün satırı siparişlere bağlandı.</p><p>Excel'den gelen geçmiş siparişlerin durumu <b>Çıkarıldı</b> olarak kaydedildi.</p><p>Yazı şablonlarına dokunulmadı; yaptığın düzenlemeler korunuyor.</p><p><a href="/">Siparişlere dön</a> · <a href="/import">Başka Excel aktar</a></p></body></html>`);
+      res.type('html').send(`<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Aktarım Tamamlandı</title></head><body style="font-family:system-ui;padding:22px"><h1>Aktarım tamamlandı</h1><p><b>${contactsAdded}</b> yeni kişi/adres eklendi, <b>${contactsSkipped}</b> kişi zaten vardı.</p><p><b>${ordersAdded}</b> geçmiş sipariş eklendi, <b>${ordersUpdated}</b> sipariş güncellendi.</p><p><b>${itemCount}</b> ürün satırı siparişlere bağlandı.</p><p>Excel'den gelen geçmiş siparişlerin durumu <b>Çıkarıldı</b> olarak kaydedildi.</p><p>Zaten güncel: ${skipped.length}. İnceleme için atlanan sıra numaraları: ${conflicts.map(s=>String(s).replace(/[^0-9-]/g,'')).join(', ')||'yok'}.</p><p>Yazı şablonlarına dokunulmadı; yaptığın düzenlemeler korunuyor.</p><p><a href="/">Siparişlere dön</a> · <a href="/import">Başka Excel aktar</a></p></body></html>`);
     }catch(e){res.status(500).send('Aktarım hatası: '+String(e.message||e))}
   });
 }
