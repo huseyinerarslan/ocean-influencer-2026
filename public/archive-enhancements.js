@@ -44,9 +44,7 @@
       const button=document.createElement('button');
       button.dataset.v='archive';
       button.textContent='Arşiv';
-      const ordersButton=side.querySelector('[data-v="orders"]');
-      if(ordersButton)ordersButton.insertAdjacentElement('afterend',button);
-      else side.appendChild(button);
+      side.insertBefore(button, side.querySelector('[onclick="logout()"]'));
       button.onclick=showArchive;
     }
 

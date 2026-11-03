@@ -51,7 +51,7 @@
       const b=document.createElement('button');b.dataset.v='sets';b.textContent='Setler';side.insertBefore(b,templatesBtn||side.lastElementChild);
     }
     if(!side.querySelector('[data-ops-manage]')){
-      const manage=document.createElement('button');manage.dataset.opsManage='1';manage.textContent='Veri Yönetimi';manage.onclick=()=>location.href='/manage';side.insertBefore(manage,side.lastElementChild);
+      const manage=document.createElement('button');manage.dataset.opsManage='1';manage.textContent='Veri Yönetimi';manage.onclick=()=>location.href='/manage';side.insertBefore(manage,side.querySelector('[data-v="archive"]')||side.lastElementChild);
     }
   }
 

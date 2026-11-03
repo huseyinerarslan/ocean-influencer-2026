@@ -15,7 +15,7 @@ const { installCatalogRoutes } = require('./catalog-import-routes');
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
 const DATABASE_URL = process.env.DATABASE_URL;
-const JWT_SECRET = process.env.JWT_SECRET || 'change-this-secret';
+const JWT_SECRET = process.env.JWT_SECRET || require('node:crypto').randomBytes(48).toString('hex');
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Ocean@123';
 
@@ -208,6 +208,30 @@ app.post('/api/logout', (req, res) => {
 
 app.get('/api/me', auth, (req, res) => {
   res.json({ user: req.user });
+});
+
+app.post('/api/users', auth, async (req, res) => {
+  try {
+    const actor = await pool.query('SELECT role FROM users WHERE id=$1', [req.user.sub]);
+    if (actor.rows[0]?.role !== 'admin') {
+      return res.status(403).json({ error: 'Kullanıcı tanımlamak için yönetici yetkisi gerekli.' });
+    }
+    const { username, password, role } = req.body || {};
+    if (typeof username !== 'string' || !username.trim() || username.trim().length > 80 ||
+        typeof password !== 'string' || password.length < 10 || Buffer.byteLength(password) > 72 ||
+        !['admin', 'operator'].includes(role)) {
+      return res.status(400).json({ error: 'Kullanıcı adını ve yetkiyi kontrol edin. Şifre en az 10 karakter, en fazla 72 bayt olmalı.' });
+    }
+    const hash = await bcrypt.hash(password, 12);
+    const created = await pool.query(
+      'INSERT INTO users(username,password_hash,role) VALUES($1,$2,$3) ON CONFLICT(username) DO NOTHING RETURNING username',
+      [username.trim(), hash, role],
+    );
+    if (!created.rowCount) return res.status(409).json({ error: 'Bu kullanıcı adı zaten kayıtlı.' });
+    res.status(201).json(created.rows[0]);
+  } catch {
+    res.status(500).json({ error: 'Kullanıcı oluşturulamadı.' });
+  }
 });
 
 app.get('/api/contacts', auth, async (req, res) => {
@@ -431,7 +455,7 @@ function sendApp(res) {
   const file = path.join(publicDir, 'index.html');
   const scripts = [
     '/ux-overhaul.js?v=4',
-    '/archive-enhancements.js?v=1',
+    '/archive-enhancements.js?v=2',
     '/premium-shell.js?v=2',
     '/reports-premium.js?v=3',
   ];
