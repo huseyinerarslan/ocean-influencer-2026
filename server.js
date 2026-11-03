@@ -12,6 +12,8 @@ const { installImportRoutes } = require('./import-routes-safe');
 const { installEditRoutes } = require('./edit-routes');
 const { installCatalogRoutes } = require('./catalog-import-routes');
 
+const operationLabels = require('./public/operation-permissions');
+const operationKeys = Object.keys(operationLabels);
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -42,6 +44,8 @@ async function schema() {
       role TEXT NOT NULL DEFAULT 'admin',
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
+
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS permissions TEXT[];
 
     CREATE TABLE IF NOT EXISTS contacts(
       id BIGSERIAL PRIMARY KEY,
@@ -144,6 +148,51 @@ function auth(req, res, next) {
   }
 }
 
+function permissionsFor(user) {
+  if (user.role === 'admin' || (user.role === 'operator' && user.permissions == null)) return operationKeys;
+  return user.permissions || [];
+}
+
+function requireOperations(...keys) {
+  return async (req, res, next) => {
+    try {
+      const result = await pool.query('SELECT role, permissions FROM users WHERE id=$1', [req.user.sub]);
+      const user = result.rows[0];
+      if (!user || !keys.every(key => permissionsFor(user).includes(key))) {
+        return res.status(403).json({ error: 'Bu işlem için yetkiniz yok.' });
+      }
+      next();
+    } catch {
+      res.status(500).json({ error: 'Yetkiler kontrol edilemedi.' });
+    }
+  };
+}
+
+// Register guards before the handlers, including multipart import handlers.
+const protectedOperations = [
+  ['post', '/api/orders', 'createOrders'],
+  ['patch', ['/api/orders/:id', '/api/orders/:id/detail', '/api/order-items/:id'], 'editOrders'],
+  ['post', '/api/orders/:id/items', 'editOrders'],
+  ['delete', '/api/order-items/:id', 'editOrders'],
+  ['post', '/api/orders/:id/dhl/create', 'shipping'],
+  ['get', '/print.html', 'print'],
+  ['post', '/api/contacts', 'contacts'],
+  ['patch', '/api/contacts/:id', 'contacts'],
+  ['post', '/api/products', 'products'],
+  ['patch', '/api/products/:id', 'products'],
+  ['delete', '/api/products/:id', 'products'],
+  ['post', '/api/sets', 'sets'],
+  ['patch', '/api/sets/:id', 'sets'],
+  ['delete', '/api/sets/:id', 'sets'],
+  ['post', '/api/templates', 'templates'],
+  ['patch', '/api/templates/:id', 'templates'],
+  ['post', '/api/import/excel', 'importExcel', 'createOrders', 'editOrders', 'products', 'contacts'],
+  ['post', '/api/catalog/import', 'importCatalog', 'products', 'sets']
+];
+for (const [method, route, ...keys] of protectedOperations) {
+  app[method](route, auth, requireOperations(...keys));
+}
+
 async function log(orderId, action, details = {}) {
   try {
     await pool.query(
@@ -197,7 +246,7 @@ app.post('/api/login', async (req, res) => {
 
   res.json({
     ok: true,
-    user: { username: q.rows[0].username, role: q.rows[0].role },
+    user: { username: q.rows[0].username, role: q.rows[0].role, permissions: permissionsFor(q.rows[0]) },
   });
 });
 
@@ -206,8 +255,15 @@ app.post('/api/logout', (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/api/me', auth, (req, res) => {
-  res.json({ user: req.user });
+app.get('/api/me', auth, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT username, role, permissions FROM users WHERE id=$1', [req.user.sub]);
+    if (!result.rowCount) return res.status(401).json({ error: 'Oturum gerekli' });
+    const user = result.rows[0];
+    res.json({ user: { ...req.user, role: user.role, permissions: permissionsFor(user) } });
+  } catch {
+    res.status(500).json({ error: 'Kullanıcı bilgisi alınamadı.' });
+  }
 });
 
 app.post('/api/users', auth, async (req, res) => {
@@ -216,16 +272,26 @@ app.post('/api/users', auth, async (req, res) => {
     if (actor.rows[0]?.role !== 'admin') {
       return res.status(403).json({ error: 'Kullanıcı tanımlamak için yönetici yetkisi gerekli.' });
     }
-    const { username, password, role } = req.body || {};
+    const { username, password, role, permissions = [] } = req.body || {};
     if (typeof username !== 'string' || !username.trim() || username.trim().length > 80 ||
         typeof password !== 'string' || password.length < 10 || Buffer.byteLength(password) > 72 ||
         !['admin', 'operator'].includes(role)) {
       return res.status(400).json({ error: 'Kullanıcı adını ve yetkiyi kontrol edin. Şifre en az 10 karakter, en fazla 72 bayt olmalı.' });
     }
+    if (!Array.isArray(permissions) || !permissions.every(key => operationKeys.includes(key))) {
+      return res.status(400).json({ error: 'Geçersiz işlem yetkisi.' });
+    }
+    if (role === 'operator') {
+      for (const [, , key, ...dependencies] of protectedOperations) {
+        if (permissions.includes(key) && dependencies.some(required => !permissions.includes(required))) {
+          return res.status(400).json({ error: operationLabels[key] + ' için gerekli yetkiler: ' + dependencies.map(required => operationLabels[required]).join(', ') });
+        }
+      }
+    }
     const hash = await bcrypt.hash(password, 12);
     const created = await pool.query(
-      'INSERT INTO users(username,password_hash,role) VALUES($1,$2,$3) ON CONFLICT(username) DO NOTHING RETURNING username',
-      [username.trim(), hash, role],
+      'INSERT INTO users(username,password_hash,role,permissions) VALUES($1,$2,$3,$4) ON CONFLICT(username) DO NOTHING RETURNING username',
+      [username.trim(), hash, role, role === 'admin' ? null : [...new Set(permissions)]],
     );
     if (!created.rowCount) return res.status(409).json({ error: 'Bu kullanıcı adı zaten kayıtlı.' });
     res.status(201).json(created.rows[0]);
