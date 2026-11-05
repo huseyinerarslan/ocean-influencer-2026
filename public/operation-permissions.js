@@ -2,7 +2,7 @@
 const operationLabels = Object.freeze({
   createOrders: 'Sipariş oluştur',
   editOrders: 'Siparişleri düzenle, durum değiştir ve arşivle',
-  shipping: 'DHL gönderisi oluştur (entegrasyon bekleniyor)',
+  shipping: 'DHL test adresi gönder ve barkod oluştur',
   print: 'Sipariş ve yazı kağıtlarını yazdır',
   contacts: 'Kişi kayıtlarını yönet',
   products: 'Ürün kataloğunu yönet',
@@ -16,6 +16,7 @@ if (typeof module !== 'undefined') module.exports = operationLabels;
 
 if (typeof document !== 'undefined') {
   const selectors = {
+    shipping: ['#dhlSandboxPanel'],
     createOrders: ['[data-v="new"]', '[onclick*="go(\'new\')"]', '#new'],
     print: ['[data-v="bulkprint"]', '#bulkprint', '.print-detail-buttons'],
     editOrders: ['#archiveOrderBtn','[onclick*="restoreOrder("]','[onclick^="markDone("]','[onclick^="saveOrderDetail("]','[onclick^="addOrderItem("]','[onclick^="saveOrderItem("]','[onclick^="removeOrderItem("]'],

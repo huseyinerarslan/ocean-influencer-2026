@@ -11,6 +11,7 @@ const { Pool } = require('pg');
 const { installImportRoutes } = require('./import-routes-safe');
 const { installEditRoutes } = require('./edit-routes');
 const { installCatalogRoutes } = require('./catalog-import-routes');
+const dhlSandbox = require('./dhl-sandbox');
 
 const operationLabels = require('./public/operation-permissions');
 const operationKeys = Object.keys(operationLabels);
@@ -504,12 +505,7 @@ app.get('/api/orders/:id/activity', auth, async (req, res) => {
   res.json(q.rows);
 });
 
-app.post('/api/orders/:id/dhl/create', auth, async (req, res) => {
-  res.status(501).json({
-    error: 'DHL eCommerce API bilgileri bekleniyor',
-    code: 'DHL_NOT_CONFIGURED',
-  });
-});
+dhlSandbox.install(app, pool, auth, requireOperations);
 
 installImportRoutes(app, pool, auth);
 installEditRoutes(app, pool, auth);
@@ -524,6 +520,7 @@ function sendApp(res) {
     '/archive-enhancements.js?v=2',
     '/premium-shell.js?v=2',
     '/reports-premium.js?v=3',
+    '/dhl-sandbox.js?v=1',
   ];
 
   const tags = scripts.map(src => `<script src="${src}"></script>`).join('');
@@ -537,6 +534,7 @@ app.use(express.static(publicDir));
 app.get('*', (req, res) => sendApp(res));
 
 schema()
+  .then(() => dhlSandbox.schema(pool))
   .then(() => app.listen(PORT, () => console.log(`Ocean Influencer running on ${PORT}`)))
   .catch(error => {
     console.error(error);
