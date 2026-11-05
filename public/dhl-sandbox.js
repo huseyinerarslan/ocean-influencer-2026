@@ -18,9 +18,9 @@
     if(!box){box=document.createElement('section');box.id='dhlSandboxPanel';document.querySelector('#orderDetailModal .ops-modal')?.append(box);}
     return box;
   }
-  function addPackage(kg='',desi='') {
+  function addPackage(kg='',desi=2) {
     const row=document.createElement('div');row.className='dhl-pack';
-    row.innerHTML=`<b>Paket ${el('dhlPackages').children.length+1}</b><label>Kg<input type="number" min="0.001" max="1000" step="0.001" required value="${esc(kg)}" data-kg></label><label>Desi<input type="number" min="0.001" max="1000" step="0.001" required value="${esc(desi)}" data-desi></label>`;
+    row.innerHTML=`<b>Paket ${el('dhlPackages').children.length+1}</b><label>Kg<input type="number" min="0.001" max="1000" step="0.001" required value="${esc(kg)}" data-kg></label><label>Desi<input type="number" min="0.001" max="1000" step="0.001" required value="${esc(desi)}" data-desi readonly></label>`;
     el('dhlPackages').append(row);
   }
   function render(data) {
@@ -51,7 +51,7 @@
     }
     if(!data.configured) el('dhlError').textContent='Sunucudaki DHL test bağlantısı yapılandırılmamış.';
     if(el('dhlPackages')) {
-      (data.packages || [{kg:'',desi:''}]).forEach(p=>addPackage(p.kg,p.desi));
+      (data.packages || [{kg:'',desi:2}]).forEach(p=>addPackage(p.kg,p.desi));
       if(frozen) el('dhlPackages').querySelectorAll('input').forEach(x=>x.disabled=true);
       if(el('dhlAddPackage')) el('dhlAddPackage').onclick=()=>{if(el('dhlPackages').children.length<20)addPackage();};
       if(el('dhlRemovePackage')) el('dhlRemovePackage').onclick=()=>{if(el('dhlPackages').children.length>1)el('dhlPackages').lastElementChild.remove();};
