@@ -3,8 +3,12 @@
   "version": "1.2.0",
   "private": true,
   "main": "server.js",
-  "scripts": {"start": "node server.js"},
-  "engines": {"node": ">=20"},
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "adm-zip": "^0.5.16",
     "bcryptjs": "^2.4.3",
@@ -13,6 +17,7 @@
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
     "pg": "^8.13.1",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "zpl-renderer-js": "4.0.0"
   }
 }

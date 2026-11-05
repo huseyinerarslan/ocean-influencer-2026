@@ -520,7 +520,7 @@ function sendApp(res) {
     '/archive-enhancements.js?v=2',
     '/premium-shell.js?v=2',
     '/reports-premium.js?v=3',
-    '/dhl-sandbox.js?v=1',
+    '/dhl-sandbox.js?v=2',
   ];
 
   const tags = scripts.map(src => `<script src="${src}"></script>`).join('');
@@ -530,6 +530,9 @@ function sendApp(res) {
 }
 
 app.get('/', (req, res) => sendApp(res));
+// Self-host the pinned renderer; label data never leaves the user's browser for conversion.
+app.get('/vendor/zpl-renderer-4.0.0.js', (req, res) => res.sendFile(path.join(path.dirname(require.resolve('zpl-renderer-js/external')), 'index.external.esm.js')));
+app.get('/vendor/zpl-renderer-4.0.0.wasm', (req, res) => res.sendFile(require.resolve('zpl-renderer-js/wasm')));
 app.use(express.static(publicDir));
 app.get('*', (req, res) => sendApp(res));
 
