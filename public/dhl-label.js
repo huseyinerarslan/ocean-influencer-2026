@@ -24,7 +24,12 @@
     const out=canvas((rotate?h:w)+2*pad,(rotate?w:h)+2*pad),ctx=out.getContext('2d');
     if(rotate){ctx.translate(pad,pad+w);ctx.rotate(-Math.PI/2);ctx.drawImage(source,x0,y0,w,h,0,0,w,h);}
     else ctx.drawImage(source,x0,y0,w,h,pad,pad,w,h);
-    if(out.width>832)throw Error('Etiket 104 mm yazdırma genişliğine sığmıyor. Otomatik küçültülmedi.');
+    if(out.width>832){
+      // Added quiet-space must never reject a valid original DHL canvas.
+      // Keep original pixels, dimensions and existing margins when the padded variant cannot fit.
+      if(source.width<=832)return source;
+      throw Error('DHL etiketinin orijinal genişliği 104 mm’yi aşıyor. Küçültmeden yazdırılamıyor.');
+    }
     return out;
   }
   try{

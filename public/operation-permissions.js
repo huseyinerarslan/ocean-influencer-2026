@@ -16,7 +16,7 @@ if (typeof module !== 'undefined') module.exports = operationLabels;
 
 if (typeof document !== 'undefined') {
   const selectors = {
-    shipping: ['#dhlSandboxPanel','#bpDhl'],
+    shipping: ['#dhlSandboxPanel','#bpDhl','#bpDhlCreate','#dhlBatchModal'],
     createOrders: ['[data-v="new"]', '[onclick*="go(\'new\')"]', '#new'],
     print: ['[data-v="bulkprint"]', '#bulkprint', '.print-detail-buttons'],
     editOrders: ['#archiveOrderBtn','[onclick*="restoreOrder("]','[onclick^="markDone("]','[onclick^="saveOrderDetail("]','[onclick^="addOrderItem("]','[onclick^="saveOrderItem("]','[onclick^="removeOrderItem("]'],

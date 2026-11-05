@@ -521,6 +521,7 @@ function sendApp(res) {
     '/premium-shell.js?v=2',
     '/reports-premium.js?v=3',
     '/dhl-sandbox.js?v=3',
+    '/dhl-bulk.js?v=1',
   ];
 
   const tags = scripts.map(src => `<script src="${src}"></script>`).join('');
