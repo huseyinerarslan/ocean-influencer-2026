@@ -134,6 +134,10 @@ function install(app, pool, auth, requireOperations, dhl = createDhlClient()) {
   async function state(db, id, value) {
     await db.query('UPDATE dhl_sandbox_shipments SET state=$2, updated_at=NOW() WHERE order_id=$1', [id, value]);
   }
+  app.get('/api/dhl/ready-labels', ...guard, handle(async (req,res) => {
+    const rows=await pool.query("SELECT order_id,reference FROM dhl_sandbox_shipments WHERE state='READY' ORDER BY order_id DESC");
+    res.set('Cache-Control','no-store');res.json(rows.rows);
+  }));
   app.get(route, ...guard, handle(async (req,res) => {
     res.json(publicState(await get(pool, validId(req)), dhl.configured()));
   }));

@@ -520,7 +520,7 @@ function sendApp(res) {
     '/archive-enhancements.js?v=2',
     '/premium-shell.js?v=2',
     '/reports-premium.js?v=3',
-    '/dhl-sandbox.js?v=2',
+    '/dhl-sandbox.js?v=3',
   ];
 
   const tags = scripts.map(src => `<script src="${src}"></script>`).join('');

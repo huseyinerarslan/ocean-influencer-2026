@@ -1,7 +1,7 @@
 (()=>{
   const el=id=>document.getElementById(id);
   const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  const selected=new Set();let bulkOrders=[];
+  const selected=new Set();let bulkOrders=[], readyLabels=new Set();
   const isImported=o=>/^EXCEL-/i.test(String(o?.order_no||''));
   const displayName=o=>isImported(o)?(o.recipient_name||'Influencer'):(o.recipient_name||o.order_no||'Sipariş');
   const dateTR=v=>{if(!v)return'—';const m=String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);return m?`${m[3]}.${m[2]}.${m[1]}`:'—'};
@@ -25,15 +25,23 @@
       b.addEventListener('click',()=>showBulkPrint());
     }
     const main=document.querySelector('.main');if(main&&!el('bulkprint')){
-      const sec=document.createElement('section');sec.id='bulkprint';sec.className='view';sec.innerHTML=`<div class="card panel"><h3>Toplu Yazdır</h3><p class="muted">Siparişleri seç. Sipariş kağıtları A5 dikey, yazı kağıtları A5 yatay olarak ayrı baskı işi açılır.</p><div class="toolbar"><input id="bpSearch" placeholder="Influencer / sipariş / şehir ara"></div><div class="print-tools"><button class="btn" id="bpAll">Tümünü Seç</button><button class="btn" id="bpClear">Seçimi Temizle</button><button class="btn primary" id="bpOrders">Seçili Sipariş Kağıtları</button><button class="btn primary" id="bpLetters">Seçili Yazı Kağıtları</button><span class="count" id="bpCount">0 seçili</span></div><div id="bpList" class="bulk-print-list"></div></div>`;main.appendChild(sec);
+      const sec=document.createElement('section');sec.id='bulkprint';sec.className='view';sec.innerHTML=`<div class="card panel"><h3>Toplu Yazdır</h3><p class="muted">Siparişleri seç. Sipariş kağıtları A5 dikey, yazı kağıtları A5 yatay olarak ayrı baskı işi açılır.</p><div class="toolbar"><input id="bpSearch" placeholder="Influencer / sipariş / şehir ara"></div><div class="print-tools"><button class="btn" id="bpAll">Tümünü Seç</button><button class="btn" id="bpClear">Seçimi Temizle</button><button class="btn primary" id="bpOrders">Seçili Sipariş Kağıtları</button><button class="btn primary" id="bpLetters">Seçili Yazı Kağıtları</button><button class="btn primary" id="bpDhl">Seçili DHL Barkodları</button><span class="count" id="bpCount">0 seçili</span></div><div id="bpList" class="bulk-print-list"></div></div>`;main.appendChild(sec);
+      el('bpDhl').onclick=()=>{
+        const ids=[...selected];
+        if(!ids.length)return say('Önce sipariş seçin.');
+        if(ids.length>50)return say('Tek seferde en fazla 50 sipariş seçin.');
+        const missing=ids.filter(id=>!readyLabels.has(id));
+        if(missing.length)return say(missing.length+' siparişin DHL test barkodu hazır değil. Yalnızca DHL hazır yazan kayıtları seçin.');
+        window.open('/dhl-label.html?ids='+ids.join(','),'_blank','noopener');
+      };
       el('bpSearch').addEventListener('input',renderBulk);el('bpAll').onclick=()=>{filteredBulk().forEach(o=>selected.add(Number(o.id)));renderBulk()};el('bpClear').onclick=()=>{selected.clear();renderBulk()};el('bpOrders').onclick=()=>openPrint('order',[...selected]);el('bpLetters').onclick=()=>openPrint('letter',[...selected]);
     }
   }
 
   function filteredBulk(){const q=(el('bpSearch')?.value||'').toLocaleLowerCase('tr-TR').trim();if(!q)return bulkOrders;return bulkOrders.filter(o=>[o.recipient_name,o.order_no,o.city,o.district].some(v=>String(v||'').toLocaleLowerCase('tr-TR').includes(q)))}
-  function renderBulk(){const list=el('bpList');if(!list)return;const rows=filteredBulk();list.innerHTML=rows.map(o=>`<label class="bulk-print-row"><input class="bpcheck" type="checkbox" value="${o.id}" ${selected.has(Number(o.id))?'checked':''}><div><div class="bulk-name">${esc(displayName(o))}</div><div class="bulk-sub">${isImported(o)?'Eski Excel kaydı':esc(o.order_no||'')}</div></div><div class="bulk-date">${dateTR(o.order_date)}</div><div class="bulk-template">Yazı: ${esc(o.letter_template_no||'Yok')}</div><div class="bulk-status">${esc(o.status||'')}</div></label>`).join('')||'<div class="muted">Kayıt bulunamadı.</div>';list.querySelectorAll('.bpcheck').forEach(c=>c.onchange=()=>{const id=Number(c.value);c.checked?selected.add(id):selected.delete(id);updateCount()});updateCount()}
+  function renderBulk(){const list=el('bpList');if(!list)return;const rows=filteredBulk();list.innerHTML=rows.map(o=>`<label class="bulk-print-row"><input class="bpcheck" type="checkbox" value="${o.id}" ${selected.has(Number(o.id))?'checked':''}><div><div class="bulk-name">${esc(displayName(o))}</div><div class="bulk-sub">${isImported(o)?'Eski Excel kaydı':esc(o.order_no||'')}</div></div><div class="bulk-date">${dateTR(o.order_date)}</div><div class="bulk-template">Yazı: ${esc(o.letter_template_no||'Yok')}</div><div class="bulk-status">${esc(o.status||'')}<div class="bulk-sub">${readyLabels.has(Number(o.id))?'DHL hazır':'DHL barkodu yok'}</div></div></label>`).join('')||'<div class="muted">Kayıt bulunamadı.</div>';list.querySelectorAll('.bpcheck').forEach(c=>c.onchange=()=>{const id=Number(c.value);c.checked?selected.add(id):selected.delete(id);updateCount()});updateCount()}
   function updateCount(){if(el('bpCount'))el('bpCount').textContent=selected.size+' seçili'}
-  async function showBulkPrint(){ensureMenuAndView();document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));el('bulkprint')?.classList.add('active');document.querySelectorAll('.side [data-v]').forEach(b=>b.classList.toggle('active',b.dataset.v==='bulkprint'));if(el('title'))el('title').textContent='Toplu Yazdır';try{bulkOrders=await req('/api/orders');renderBulk()}catch(e){say(e.message)}}
+  async function showBulkPrint(){ensureMenuAndView();document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));el('bulkprint')?.classList.add('active');document.querySelectorAll('.side [data-v]').forEach(b=>b.classList.toggle('active',b.dataset.v==='bulkprint'));if(el('title'))el('title').textContent='Toplu Yazdır';try{const results=await Promise.all([req('/api/orders'),req('/api/dhl/ready-labels').catch(()=>[])]);bulkOrders=results[0];readyLabels=new Set(results[1].map(x=>Number(x.order_id)));renderBulk()}catch(e){say(e.message)}}
   window.showBulkPrint=showBulkPrint;
 
   const originalOpen=window.openOrderDetail;

@@ -3,7 +3,7 @@
   function splitLabels(zpl){
     if(typeof zpl!=='string'||zpl.length>2000000)throw Error('Etiket verisi geçersiz veya çok büyük.');
     const labels=zpl.match(/\^XA[\s\S]*?\^XZ/g)||[];
-    if(!labels.length||labels.length>20)throw Error('Etiket sayısı geçersiz.');
+    if(!labels.length||labels.length>100)throw Error('Etiket sayısı geçersiz.');
     return labels.map(text=>{
       const w=[...text.matchAll(/\^PW(\d+)/g)].at(-1),h=[...text.matchAll(/\^LL(\d+)/g)].at(-1);
       // DHL sandbox labels are 203 dpi (8 dots/mm). Do not crop to a guessed paper size.
