@@ -27,7 +27,7 @@
     }
     function update(row){
       const d=row.data,remaining=Math.max(0,Math.ceil((row.until-Date.now())/1000));
-      row.element.querySelector('[data-status]').textContent=(d?labels[d.state]||d.state:'Durum alınamadı')+(remaining?' · '+remaining+' sn bekleyin':'')+(d?.reference?' · '+d.reference:'');
+      row.element.querySelector('[data-status]').textContent=(d?.preparing?'Barkod arka planda hazırlanıyor':d?labels[d.state]||d.state:'Durum alınamadı')+(remaining?' · '+remaining+' sn bekleyin':'')+(d?.reference?' · '+d.reference:'');
       row.element.querySelector('[data-error]').textContent=row.error;
       const frozen=!!d?.packages||d?.state==='READY';
       row.element.querySelectorAll('input,[data-add],[data-remove]').forEach(x=>x.disabled=busy||frozen);
@@ -53,7 +53,7 @@
       for(const row of rows){
         row.error='';const d=row.data;
         if(!d){row.error='Önce durumları yenileyin.';update(row);continue;}
-        if(d.state==='READY')continue;
+        if(d.state==='READY'||d.preparing)continue;
         if(kind==='prepare'){
           if(['NEW','REJECTED'].includes(d.state))jobs.push({row,suffix:'/prepare',body:{}});
         }else{

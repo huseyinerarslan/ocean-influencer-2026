@@ -26,6 +26,11 @@
   function render(data) {
     clearInterval(timer);
     const box=panel();
+    if(data.preparing){
+      box.innerHTML='<h4>DHL · TEST ORTAMI</h4><p role="status">Test barkodu arka planda hazırlanıyor. Bu pencereyi kapatabilirsiniz.</p>';
+      timer=setTimeout(()=>{if(box.offsetWidth)refresh();},5000);
+      return;
+    }
     const frozen=!!data.packages;
     const pending=['CREATING','UNKNOWN','LABEL_CREATING','LABEL_UNKNOWN'].includes(data.state);
     const initial=['NEW','REJECTED'].includes(data.state);
@@ -49,9 +54,10 @@
       el('dhlPrepare').disabled=!data.configured;
       el('dhlPrepare').onclick=()=>run('/prepare',{});
     }
+    if(data.autoError && data.state!=='READY') el('dhlError').textContent=data.autoError;
     if(!data.configured) el('dhlError').textContent='Sunucudaki DHL test bağlantısı yapılandırılmamış.';
     if(el('dhlPackages')) {
-      (data.packages || [{kg:'',desi:2}]).forEach(p=>addPackage(p.kg,p.desi));
+      (data.packages || data.plannedPackages || [{kg:'',desi:2}]).forEach(p=>addPackage(p.kg,p.desi));
       if(frozen) el('dhlPackages').querySelectorAll('input').forEach(x=>x.disabled=true);
       if(el('dhlAddPackage')) el('dhlAddPackage').onclick=()=>{if(el('dhlPackages').children.length<20)addPackage();};
       if(el('dhlRemovePackage')) el('dhlRemovePackage').onclick=()=>{if(el('dhlPackages').children.length>1)el('dhlPackages').lastElementChild.remove();};

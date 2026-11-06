@@ -423,6 +423,14 @@ app.get('/api/orders/days', auth, async (req, res) => {
 
 app.post('/api/orders', auth, async (req, res) => {
   const x = req.body || {};
+  const packages = x.dhl_packages;
+  if (packages !== undefined) {
+    try {
+      dhlSandbox.pieces(packages, 'TEST');
+      if (packages.some(p => p.desi !== 2)) throw Error('Paket desisi 2 olmalı.');
+      dhlSandbox.recipient(x);
+    } catch (error) { return res.status(400).json({error: error.message}); }
+  }
   const no = await nextNo();
   const client = await pool.connect();
 
@@ -457,6 +465,10 @@ app.post('/api/orders', auth, async (req, res) => {
       );
     }
 
+    if (packages) {
+      await client.query('INSERT INTO dhl_sandbox_jobs(order_id,packages) VALUES($1,$2::jsonb)',
+        [q.rows[0].id, JSON.stringify(packages)]);
+    }
     await client.query('COMMIT');
     await log(q.rows[0].id, 'ORDER_CREATED', { user: req.user.username });
     res.json(q.rows[0]);
@@ -505,7 +517,7 @@ app.get('/api/orders/:id/activity', auth, async (req, res) => {
   res.json(q.rows);
 });
 
-dhlSandbox.install(app, pool, auth, requireOperations);
+const dhlActions = dhlSandbox.install(app, pool, auth, requireOperations);
 
 installImportRoutes(app, pool, auth);
 installEditRoutes(app, pool, auth);
@@ -520,8 +532,8 @@ function sendApp(res) {
     '/archive-enhancements.js?v=2',
     '/premium-shell.js?v=2',
     '/reports-premium.js?v=3',
-    '/dhl-sandbox.js?v=4',
-    '/dhl-bulk.js?v=2',
+    '/dhl-sandbox.js?v=5',
+    '/dhl-bulk.js?v=3',
   ];
 
   const tags = scripts.map(src => `<script src="${src}"></script>`).join('');
@@ -539,6 +551,7 @@ app.get('*', (req, res) => sendApp(res));
 
 schema()
   .then(() => dhlSandbox.schema(pool))
+  .then(() => require('./dhl-worker').start(pool, dhlActions))
   .then(() => app.listen(PORT, () => console.log(`Ocean Influencer running on ${PORT}`)))
   .catch(error => {
     console.error(error);

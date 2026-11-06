@@ -96,6 +96,12 @@ async function schema(pool) {
     prepared_at TIMESTAMPTZ, attempted_at TIMESTAMPTZ,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS dhl_sandbox_jobs (
+    order_id BIGINT PRIMARY KEY REFERENCES orders(id) ON DELETE CASCADE,
+    packages JSONB NOT NULL, due_at TIMESTAMPTZ DEFAULT NOW(),
+    attempts INTEGER NOT NULL DEFAULT 0, error TEXT
+  )`);
+
 }
 function publicState(row, configured) {
   return { mode: 'sandbox', configured: !!configured, state: row?.state || 'NEW',
@@ -134,18 +140,25 @@ function install(app, pool, auth, requireOperations, dhl = createDhlClient()) {
   async function state(db, id, value) {
     await db.query('UPDATE dhl_sandbox_shipments SET state=$2, updated_at=NOW() WHERE order_id=$1', [id, value]);
   }
+  app.get('/api/dhl/label-progress', ...guard, handle(async (req,res) => {
+    const {rows} = await pool.query(`SELECT j.order_id,j.error FROM dhl_sandbox_jobs j
+      LEFT JOIN dhl_sandbox_shipments s ON s.order_id=j.order_id WHERE s.state IS DISTINCT FROM 'READY'`);
+    res.set('Cache-Control','no-store');
+    res.json(rows);
+  }));
   app.get('/api/dhl/ready-labels', ...guard, handle(async (req,res) => {
     const rows=await pool.query("SELECT order_id,reference FROM dhl_sandbox_shipments WHERE state='READY' ORDER BY order_id DESC");
     res.set('Cache-Control','no-store');res.json(rows.rows);
   }));
   app.get(route, ...guard, handle(async (req,res) => {
-    res.json(publicState(await get(pool, validId(req)), dhl.configured()));
-  }));
-  app.post(route+'/prepare', ...guard, handle(async (req,res) => {
     const id = validId(req);
-    if (req.body?.sandbox !== true) throw fail(400, 'DHL test ortamı seçilmelidir.');
+    const data = publicState(await get(pool,id), dhl.configured());
+    const job = (await pool.query('SELECT due_at,error,packages FROM dhl_sandbox_jobs WHERE order_id=$1',[id])).rows[0];
+    res.json({...data, preparing: !!job?.due_at && data.state !== 'READY', autoError: job?.error, plannedPackages: job?.packages});
+  }));
+  async function prepare(id) {
     if (!dhl.configured()) throw fail(503, 'DHL test bağlantısı henüz yapılandırılmadı.');
-    const row = await locked(id, async db => {
+    return locked(id, async db => {
       let row = await get(db,id);
       if (row && !['REJECTED'].includes(row.state)) {
         if (['CREATING','UNKNOWN'].includes(row.state)) throw fail(409, `Önceki isteğin sonucu belirsiz. DHL’ye ${row.reference} referansıyla sorulmalı; ikinci sipariş oluşturulmadı.`);
@@ -165,19 +178,16 @@ function install(app, pool, auth, requireOperations, dhl = createDhlClient()) {
       } catch(e) { await state(db,id,e.rejected ? 'REJECTED' : 'UNKNOWN'); throw e; }
       return get(db,id);
     });
-    res.json(publicState(row,dhl.configured()));
-  }));
-  app.post(route+'/create', ...guard, handle(async(req,res) => {
-    const id=validId(req);
-    if(req.body?.sandbox !== true) throw fail(400,'DHL test ortamı seçilmelidir.');
-    const row=await locked(id,async db => {
+  }
+  async function create(id, input) {
+    return locked(id, async db => {
       let row=await get(db,id);
       if(row?.state==='READY') return row; // No additional remote creation, even after reload.
       if(!row || ['REJECTED'].includes(row.state)) throw fail(409,'Önce adresi DHL test ortamına gönderin.');
       if(!['PREPARED','WAITING'].includes(row.state)) throw fail(409,`İşlem sonucu kontrol edilmeli. DHL referansı: ${row.reference}. Yeni istek gönderilmedi.`);
       if(publicState(row,true).retryAfter>0) throw fail(409,'DHL adresi işliyor. En az 30 saniye sonra barkodu tekrar deneyin.');
-      const packages=pieces(req.body.packages,row.reference);
-      if(row.packages && JSON.stringify(row.packages)!==JSON.stringify(packages)) throw fail(409,'İlk barkod isteğinden sonra paket bilgileri değiştirilemez.');
+      const packages=pieces(input,row.reference);
+      if(row.packages && !require('node:util').isDeepStrictEqual(row.packages, packages)) throw fail(409,'İlk barkod isteğinden sonra paket bilgileri değiştirilemez.');
       await db.query("UPDATE dhl_sandbox_shipments SET state='LABEL_CREATING',packages=$2::jsonb,attempted_at=NOW(),updated_at=NOW() WHERE order_id=$1",[id,JSON.stringify(packages)]);
       try {
         const raw=await dhl.call('barcodecmdapi/createbarcode',{referenceId:row.reference,billOfLandingId:'',isCOD:0,codAmount:0,
@@ -187,8 +197,13 @@ function install(app, pool, auth, requireOperations, dhl = createDhlClient()) {
       } catch(e) { await state(db,id,e.rejected ? 'WAITING' : 'LABEL_UNKNOWN'); throw e; }
       return get(db,id);
     });
-    res.json(publicState(row,dhl.configured()));
-  }));
+  }
+  for (const [path, action] of [['/prepare', prepare], ['/create', create]]) {
+    app.post(route+path, ...guard, handle(async (req,res) => {
+      if (req.body?.sandbox !== true) throw fail(400,'DHL test ortamı seçilmelidir.');
+      res.json(publicState(await action(validId(req), req.body.packages), dhl.configured()));
+    }));
+  }
   app.get(route+'/label', ...guard, handle(async(req,res) => {
     const row=await get(pool,validId(req));
     if(row?.state!=='READY') throw fail(409,'Gönderi etiketi henüz hazır değil.');
@@ -196,5 +211,7 @@ function install(app, pool, auth, requireOperations, dhl = createDhlClient()) {
     res.set('Content-Disposition',`attachment; filename="DHL-TEST-${row.reference}.zpl"`);
     res.type('text/plain').send(row.result.labels.map(x=>x.value).join('\n'));
   }));
+  return {prepare, create};
+
 }
 module.exports={createDhlClient,recipient,pieces,orderPayload,labelResult,publicState,schema,install};

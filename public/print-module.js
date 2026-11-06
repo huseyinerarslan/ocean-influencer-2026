@@ -1,7 +1,7 @@
 (()=>{
   const el=id=>document.getElementById(id);
   const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  const selected=new Set();let bulkOrders=[], readyLabels=new Set();
+  const selected=new Set();let bulkOrders=[], readyLabels=new Set(), progress=new Map(), poll;
   const isImported=o=>/^EXCEL-/i.test(String(o?.order_no||''));
   const displayName=o=>isImported(o)?(o.recipient_name||'Influencer'):(o.recipient_name||o.order_no||'Sipariş');
   const dateTR=v=>{if(!v)return'—';const m=String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);return m?`${m[3]}.${m[2]}.${m[1]}`:'—'};
@@ -40,9 +40,17 @@
   }
 
   function filteredBulk(){const q=(el('bpSearch')?.value||'').toLocaleLowerCase('tr-TR').trim();if(!q)return bulkOrders;return bulkOrders.filter(o=>[o.recipient_name,o.order_no,o.city,o.district].some(v=>String(v||'').toLocaleLowerCase('tr-TR').includes(q)))}
-  function renderBulk(){const list=el('bpList');if(!list)return;const rows=filteredBulk();list.innerHTML=rows.map(o=>`<label class="bulk-print-row"><input class="bpcheck" type="checkbox" value="${o.id}" ${selected.has(Number(o.id))?'checked':''}><div><div class="bulk-name">${esc(displayName(o))}</div><div class="bulk-sub">${isImported(o)?'Eski Excel kaydı':esc(o.order_no||'')}</div></div><div class="bulk-date">${dateTR(o.order_date)}</div><div class="bulk-template">Yazı: ${esc(o.letter_template_no||'Yok')}</div><div class="bulk-status">${esc(o.status||'')}<div class="bulk-sub">${readyLabels.has(Number(o.id))?'DHL hazır':'DHL barkodu henüz oluşturulmadı'}</div></div></label>`).join('')||'<div class="muted">Kayıt bulunamadı.</div>';list.querySelectorAll('.bpcheck').forEach(c=>c.onchange=()=>{const id=Number(c.value);c.checked?selected.add(id):selected.delete(id);updateCount()});updateCount()}
+  function renderBulk(){const list=el('bpList');if(!list)return;const rows=filteredBulk();list.innerHTML=rows.map(o=>`<label class="bulk-print-row"><input class="bpcheck" type="checkbox" value="${o.id}" ${selected.has(Number(o.id))?'checked':''}><div><div class="bulk-name">${esc(displayName(o))}</div><div class="bulk-sub">${isImported(o)?'Eski Excel kaydı':esc(o.order_no||'')}</div></div><div class="bulk-date">${dateTR(o.order_date)}</div><div class="bulk-template">Yazı: ${esc(o.letter_template_no||'Yok')}</div><div class="bulk-status">${esc(o.status||'')}<div class="bulk-sub">${readyLabels.has(Number(o.id))?'DHL hazır':progress.has(Number(o.id))?esc(progress.get(Number(o.id)) || 'DHL barkodu hazırlanıyor…'):'DHL barkodu henüz oluşturulmadı'}</div></div></label>`).join('')||'<div class="muted">Kayıt bulunamadı.</div>';list.querySelectorAll('.bpcheck').forEach(c=>c.onchange=()=>{const id=Number(c.value);c.checked?selected.add(id):selected.delete(id);updateCount()});updateCount()}
   function updateCount(){if(el('bpCount'))el('bpCount').textContent=selected.size+' seçili'}
-  async function showBulkPrint(){ensureMenuAndView();document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));el('bulkprint')?.classList.add('active');document.querySelectorAll('.side [data-v]').forEach(b=>b.classList.toggle('active',b.dataset.v==='bulkprint'));if(el('title'))el('title').textContent='Toplu Yazdır';try{const results=await Promise.all([req('/api/orders'),req('/api/dhl/ready-labels').catch(()=>[])]);bulkOrders=results[0];readyLabels=new Set(results[1].map(x=>Number(x.order_id)));renderBulk()}catch(e){say(e.message)}}
+  async function refreshLabels(){
+    clearTimeout(poll);
+    const [ready,jobs]=await Promise.all([req('/api/dhl/ready-labels'),req('/api/dhl/label-progress')]);
+    readyLabels=new Set(ready.map(x=>Number(x.order_id)));
+    progress=new Map(jobs.map(x=>[Number(x.order_id),x.error]));
+    renderBulk();
+    if(jobs.some(x=>!x.error))poll=setTimeout(()=>{if(el('bulkprint')?.classList.contains('active'))refreshLabels().catch(e=>say(e.message));},5000);
+  }
+  async function showBulkPrint(){ensureMenuAndView();document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));el('bulkprint')?.classList.add('active');document.querySelectorAll('.side [data-v]').forEach(b=>b.classList.toggle('active',b.dataset.v==='bulkprint'));if(el('title'))el('title').textContent='Toplu Yazdır';try{bulkOrders=await req('/api/orders');renderBulk();await refreshLabels().catch(()=>{})}catch(e){say(e.message)}}
   window.showBulkPrint=showBulkPrint;
 
   const originalOpen=window.openOrderDetail;
