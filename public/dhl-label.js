@@ -37,7 +37,7 @@
     const labels=[];
     for(let offset=0;offset<ids.length;offset+=4){
       const batch=await Promise.all(ids.slice(offset,offset+4).map(async id=>{
-        const r=await fetch(`/api/orders/${id}/dhl/label`,{credentials:'same-origin',cache:'no-store'});
+        const r=await fetch(`/api/orders/${id}/dhl/label${params.has('group')?'?group='+encodeURIComponent(params.get('group')):''}`,{credentials:'same-origin',cache:'no-store'});
         if(!r.ok){const d=await r.json().catch(()=>({}));throw Error(`Sipariş #${id}: ${d.error||'Etiket alınamadı.'} Hiçbir etiket yazdırılmadı.`);}
         return r.text();
       }));labels.push(...batch);el('status').textContent=`${labels.length}/${ids.length} siparişin etiketleri yüklendi…`;

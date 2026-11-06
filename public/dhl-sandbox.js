@@ -18,9 +18,9 @@
     if(!box){box=document.createElement('section');box.id='dhlSandboxPanel';document.querySelector('#orderDetailModal .ops-modal')?.append(box);}
     return box;
   }
-  function addPackage(kg='',desi=2) {
+  function addPackage(kg=2,desi=2) {
     const row=document.createElement('div');row.className='dhl-pack';
-    row.innerHTML=`<b>Paket ${el('dhlPackages').children.length+1}</b><label>Kg<input type="number" min="0.001" max="1000" step="0.001" required value="${esc(kg)}" data-kg></label><label>Desi<input type="number" min="0.001" max="1000" step="0.001" required value="${esc(desi)}" data-desi readonly></label>`;
+    row.innerHTML=`<b>Paket ${el('dhlPackages').children.length+1}</b><label>Kg<input type="number" min="0.001" max="1000" step="0.001" required value="${esc(kg)}" data-kg readonly></label><label>Desi<input type="number" min="0.001" max="1000" step="0.001" required value="${esc(desi)}" data-desi readonly></label>`;
     el('dhlPackages').append(row);
   }
   function render(data) {
@@ -40,7 +40,7 @@
       <div id="dhlError" role="alert"></div>
       <div id="dhlSnapshot"></div>
       ${initial?'<p>Önce yukarıdaki alıcı, il, ilçe ve açık adresi kontrol edip <b>Sipariş Bilgilerini Kaydet</b> düğmesine basın. Kayıtlı ad ve adres DHL test sistemine gönderilecektir.</p><button id="dhlPrepare" class="btn primary">1. Adresi DHL teste gönder</button>':''}
-      ${['PREPARED','WAITING'].includes(data.state)?`<p>Paket hazır olduğunda her kolinin kg ve desi bilgisini girin.</p><form id="dhlLabelForm"><div id="dhlPackages"></div><div class="ops-actions">${!frozen?'<button type="button" class="btn" id="dhlAddPackage">Paket ekle</button><button type="button" class="btn" id="dhlRemovePackage">Son paketi kaldır</button>':''}<button class="btn primary" id="dhlCreate" type="submit">2. Test barkodu oluştur</button></div></form>`:''}
+      ${['PREPARED','WAITING'].includes(data.state)?`<p>Her yeni paket 2 kg / 2 desidir.</p><form id="dhlLabelForm"><div id="dhlPackages"></div><div class="ops-actions">${!frozen?'<button type="button" class="btn" id="dhlAddPackage">Paket ekle</button><button type="button" class="btn" id="dhlRemovePackage">Son paketi kaldır</button>':''}<button class="btn primary" id="dhlCreate" type="submit">2. Test barkodu oluştur</button></div></form>`:''}
       ${data.state==='READY'?'<button id="dhlPreview" class="btn primary">Etiketi görüntüle / Yazdır</button> <button id="dhlDownload" class="btn">ZPL indir (teknik)</button><p>Etiketi görüntüleyip normal yazdırma ekranından yazıcınızı seçebilirsiniz. Bu test etiketini gerçek kargoda kullanmayın.</p>':''}
       <button id="dhlRefresh" class="btn" style="margin-top:10px">Durumu yenile</button>`;
     const messages={NEW:'Test kaydı henüz oluşturulmadı.',REJECTED:'DHL adres isteğini reddetti. Bilgileri düzeltip kaydettikten sonra tekrar deneyin.',
@@ -57,7 +57,7 @@
     if(data.autoError && data.state!=='READY') el('dhlError').textContent=data.autoError;
     if(!data.configured) el('dhlError').textContent='Sunucudaki DHL test bağlantısı yapılandırılmamış.';
     if(el('dhlPackages')) {
-      (data.packages || data.plannedPackages || [{kg:'',desi:2}]).forEach(p=>addPackage(p.kg,p.desi));
+      (data.packages || data.plannedPackages || [{kg:2,desi:2}]).forEach(p=>addPackage(p.kg,p.desi));
       if(frozen) el('dhlPackages').querySelectorAll('input').forEach(x=>x.disabled=true);
       if(el('dhlAddPackage')) el('dhlAddPackage').onclick=()=>{if(el('dhlPackages').children.length<20)addPackage();};
       if(el('dhlRemovePackage')) el('dhlRemovePackage').onclick=()=>{if(el('dhlPackages').children.length>1)el('dhlPackages').lastElementChild.remove();};
@@ -66,7 +66,35 @@
       const tick=()=>{const b=el('dhlCreate');if(!b)return clearInterval(timer);b.disabled=busy||remaining>0||!data.configured;b.textContent=remaining>0?`Adres işleniyor · ${remaining} sn`:'2. Test barkodu oluştur';remaining--;};
       tick();if(remaining>=0)timer=setInterval(tick,1000);
     }
-    if(el('dhlPreview')) el('dhlPreview').onclick=()=>window.open('/dhl-label.html?order='+encodeURIComponent(activeId), '_blank', 'noopener');
+    if(el('dhlPreview')) {
+      const openLabel=group=>window.open('/dhl-label.html?order='+encodeURIComponent(activeId)+'&group='+group,'_blank','noopener');
+      el('dhlPreview').onclick=()=>openLabel(1);
+      const extras=data.extras || [];
+      for(const pack of extras){
+        const line=document.createElement('p');
+        box.append(line);
+        if(pack.state==='READY'){
+          const print=document.createElement('button');
+          print.className='btn primary';
+          print.textContent=pack.group_no+'. paketi yazdır';
+          print.onclick=()=>openLabel(pack.group_no);
+          line.append(print);
+        }else{
+          line.textContent=pack.group_no+'. paket · '+(pack.error || 'Barkod hazırlanıyor…');
+        }
+      }
+      const next=Math.max(data.packages?.length || 1,...extras.map(x=>x.group_no))+1;
+      if(next<=3 && extras.every(x=>x.state==='READY')){
+        const add=document.createElement('button');
+        add.className='btn';
+        add.textContent=next+'. paketi oluştur (2 kg / 2 desi)';
+        add.onclick=()=>run('/extra',{group:next});
+        box.append(add);
+      }
+      if(extras.some(x=>x.state!=='READY' && !x.error)){
+        timer=setTimeout(()=>{if(!busy && box.offsetWidth)refresh();},5000);
+      }
+    }
     if(el('dhlDownload')) el('dhlDownload').onclick=async()=>{
       try {
         const r=await fetch(`/api/orders/${activeId}/dhl/label`);

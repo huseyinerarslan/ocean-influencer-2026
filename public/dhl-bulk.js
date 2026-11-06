@@ -16,14 +16,14 @@
     if(!orders.length||orders.length>50)return alert('1–50 sipariş seçin.');
     if(document.getElementById('dhlBatchModal'))return;
     const modal=document.createElement('div');modal.id='dhlBatchModal';modal.className='ops-modal-bg show';modal.style.zIndex='10001';
-    modal.innerHTML=`<div class="ops-modal"><h3>Toplu DHL · TEST ORTAMI</h3><p>Desi her yeni paket için 2’dir. Kg bilgilerini girip Barkodları oluştur düğmesine bir kez basın. Adres gönderimi ve DHL beklemesi otomatik ilerler; aynı anda 3 sipariş işlenir. Hazır barkodlar yeniden oluşturulmaz. Gerçek gönderi yapılmaz.</p><div class="ops-actions"><button class="btn primary" data-create>Barkodları oluştur</button><button class="btn" data-prepare>Adresleri önceden gönder (isteğe bağlı)</button><button class="btn" data-refresh>Durumları yenile</button><button class="btn" data-print>Hazır barkodları yazdır</button><button class="btn" data-close>Kapat</button></div><p data-summary role="status" aria-live="polite"></p><div class="dhl-pack"><label>Paketlerin kg değeri aynıysa<input data-common-kg type="number" min="0.001" max="1000" step="0.001" placeholder="Kg"></label><button class="btn" data-apply-kg>Kg değerini boş alanlara uygula</button><b>Desi: 2 (sabit)</b></div><div data-rows></div></div>`;
+    modal.innerHTML=`<div class="ops-modal"><h3>Toplu DHL · TEST ORTAMI</h3><p>Her yeni paket 2 kg / 2 desidir. Adres gönderimi ve DHL beklemesi otomatik ilerler; aynı anda 3 sipariş işlenir. Hazır barkodlar yeniden oluşturulmaz. Gerçek gönderi yapılmaz.</p><div class="ops-actions"><button class="btn primary" data-create>Barkodları oluştur</button><button class="btn" data-prepare>Adresleri önceden gönder (isteğe bağlı)</button><button class="btn" data-refresh>Durumları yenile</button><button class="btn" data-print>Hazır barkodları yazdır</button><button class="btn" data-close>Kapat</button></div><p data-summary role="status" aria-live="polite"></p><div data-rows></div></div>`;
     document.body.append(modal);
     const get=s=>modal.querySelector(s);let busy=false;
     const rows=orders.map(o=>({order:o,data:null,until:0,error:'',element:null}));
     function setBusy(value){busy=value;modal.querySelectorAll('button,input').forEach(x=>x.disabled=value);if(!value)rows.forEach(update);}
-    function addPackage(row,p={kg:'',desi:2}){
+    function addPackage(row,p={kg:2,desi:2}){
       const box=row.element.querySelector('[data-packages]');if(box.children.length>=20)return;
-      const item=document.createElement('div');item.className='dhl-pack';item.innerHTML=`<b>Paket ${box.children.length+1}</b><label>Kg <input data-kg type="number" min="0.001" max="1000" step="0.001" value="${esc(p.kg)}"></label><label>Desi <input data-desi readonly type="number" min="0.001" max="1000" step="0.001" value="${esc(p.desi)}"></label>`;box.append(item);
+      const item=document.createElement('div');item.className='dhl-pack';item.innerHTML=`<b>Paket ${box.children.length+1}</b><label>Kg <input data-kg readonly type="number" min="0.001" max="1000" step="0.001" value="${esc(p.kg)}"></label><label>Desi <input data-desi readonly type="number" min="0.001" max="1000" step="0.001" value="${esc(p.desi)}"></label>`;box.append(item);
     }
     function update(row){
       const d=row.data,remaining=Math.max(0,Math.ceil((row.until-Date.now())/1000));
@@ -81,11 +81,6 @@
       });
       setBusy(false);summary();
     }
-    get('[data-apply-kg]').onclick=()=>{
-      const kg=Number(get('[data-common-kg]').value);
-      if(!Number.isFinite(kg)||kg<=0||kg>1000){get('[data-summary]').textContent='Geçerli bir kg değeri girin.';return;}
-      rows.filter(row=>!row.data?.packages&&row.data?.state!=='READY').forEach(row=>row.element.querySelectorAll('[data-kg]').forEach(input=>{if(!input.value)input.value=kg;}));
-    };
     get('[data-prepare]').onclick=()=>run('prepare');get('[data-create]').onclick=()=>run('create');get('[data-refresh]').onclick=refresh;
     get('[data-print]').onclick=()=>{const ids=rows.filter(r=>r.data?.state==='READY').map(r=>r.order.id);if(!ids.length){get('[data-summary]').textContent='Henüz hazır barkod yok.';return;}window.open('/dhl-label.html?ids='+ids.join(','),'_blank','noopener');};
     const timer=setInterval(()=>rows.forEach(update),1000);

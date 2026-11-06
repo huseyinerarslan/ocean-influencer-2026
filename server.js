@@ -423,14 +423,9 @@ app.get('/api/orders/days', auth, async (req, res) => {
 
 app.post('/api/orders', auth, async (req, res) => {
   const x = req.body || {};
-  const packages = x.dhl_packages;
-  if (packages !== undefined) {
-    try {
-      dhlSandbox.pieces(packages, 'TEST');
-      if (packages.some(p => p.desi !== 2)) throw Error('Paket desisi 2 olmalı.');
-      dhlSandbox.recipient(x);
-    } catch (error) { return res.status(400).json({error: error.message}); }
-  }
+  const packages = [{kg:2, desi:2}];
+  try { dhlSandbox.recipient(x); }
+  catch (error) { return res.status(400).json({error:error.message}); }
   const no = await nextNo();
   const client = await pool.connect();
 
@@ -532,8 +527,8 @@ function sendApp(res) {
     '/archive-enhancements.js?v=2',
     '/premium-shell.js?v=2',
     '/reports-premium.js?v=3',
-    '/dhl-sandbox.js?v=5',
-    '/dhl-bulk.js?v=3',
+    '/dhl-sandbox.js?v=6',
+    '/dhl-bulk.js?v=4',
   ];
 
   const tags = scripts.map(src => `<script src="${src}"></script>`).join('');
