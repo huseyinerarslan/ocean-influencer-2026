@@ -13,6 +13,19 @@
       return {zpl:text,widthDots,heightDots,widthMm:widthDots/8,heightMm:heightDots/8};
     });
   }
-  if(typeof module!=='undefined')module.exports={splitLabels};
-  else root.dhlLabelLayout={splitLabels};
+  // Suppress only identified human-readable metric lines in the print copy.
+  // DHL also uses ^FH to hex-encode Turkish characters in thermal fonts.
+  function printCopy(zpl){
+    return zpl.split('^FS').map(field=>{
+      if(!/\^A[A-Z0-9]/i.test(field) || /\^B[A-Z0-9]/i.test(field))return field;
+      return field.replace(/\^FD([^\^~]*)$/i,(command,value)=>{
+        const decoded=value.replace(/_([\da-f]{2})/gi,(_,hex)=>String.fromCharCode(parseInt(hex,16)));
+        const line=decoded.trim().toLocaleLowerCase('tr-TR');
+        return /^(?:kg|ds|desi|toplam|parça|parã§a)\s*[:=]\s*\d/i.test(line)?'^FD':command;
+      });
+    }).join('^FS');
+  }
+  const helpers={splitLabels,printCopy};
+  if(typeof module!=='undefined')module.exports=helpers;
+  else root.dhlLabelLayout=helpers;
 })(globalThis);

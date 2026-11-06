@@ -1,5 +1,5 @@
 import { init, zplToBase64Async } from '/vendor/zpl-renderer-4.0.0.js';
-import '/dhl-label-layout.js?v=2';
+import '/dhl-label-layout.js?v=3';
 self.onmessage=async({data})=>{
   try{
     const labels=self.dhlLabelLayout.splitLabels(data);
@@ -12,7 +12,7 @@ self.onmessage=async({data})=>{
 
     for(let i=0;i<labels.length;i++){
       const label=labels[i];
-      const png=await zplToBase64Async(label.zpl.replace('^XA','^XA'+fontCommand),label.widthMm,label.heightMm,8,{enableInvertedLabels:true,grayscaleOutput:false});
+      const png=await zplToBase64Async(self.dhlLabelLayout.printCopy(label.zpl).replace('^XA','^XA'+fontCommand),label.widthMm,label.heightMm,8,{enableInvertedLabels:true,grayscaleOutput:false});
       const rotate=([...label.zpl.matchAll(/\^A[^\^~,]*R/g)].length > [...label.zpl.matchAll(/\^A[^\^~,]*N/g)].length);
       self.postMessage({type:'label',rotate,index:i,total:labels.length,widthMm:label.widthMm,heightMm:label.heightMm,png});
     }

@@ -18,20 +18,52 @@
       if(pixels[p]<245||pixels[p+1]<245||pixels[p+2]<245){x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y);}
     }
     if(x1<0)throw Error('Boş etiket döndü.');
-    // Keep every inked pixel and add 4 mm quiet space. Never resize barcode modules.
-    const w=x1-x0+1,h=y1-y0+1,pad=32;
-    const rotate=d.rotate && h+2*pad<=832;
-    const out=canvas((rotate?h:w)+2*pad,(rotate?w:h)+2*pad),ctx=out.getContext('2d');
-    if(rotate){ctx.translate(pad,pad+w);ctx.rotate(-Math.PI/2);ctx.drawImage(source,x0,y0,w,h,0,0,w,h);}
-    else ctx.drawImage(source,x0,y0,w,h,pad,pad,w,h);
-    if(out.width>832){
-      // Added quiet-space must never reject a valid original DHL canvas.
-      // Keep original pixels, dimensions and existing margins when the padded variant cannot fit.
-      if(source.width<=832)return source;
-      throw Error('DHL etiketinin orijinal genişliği 104 mm’yi aşıyor. Küçültmeden yazdırılamıyor.');
-    }
+    const w=x1-x0+1,h=y1-y0+1;
+    const out=canvas(d.rotate?h:w,d.rotate?w:h),ctx=out.getContext('2d');
+    if(d.rotate){ctx.translate(0,w);ctx.rotate(-Math.PI/2);}
+    ctx.drawImage(source,x0,y0,w,h,0,0,w,h);
     return out;
   }
+
+  let artwork=[];
+  const pageRule=document.createElement('style');
+  document.head.append(pageRule);
+  const widthInput=el('paperWidth'),heightInput=el('paperHeight');
+  try{
+    const saved=JSON.parse(localStorage.getItem('dhl-print-mm') || 'null');
+    if(saved){widthInput.value=saved.w;heightInput.value=saved.h;}
+  }catch{}
+  function layout(){
+    if(!artwork.length)return;
+    const w=widthInput.valueAsNumber,h=heightInput.valueAsNumber;
+    const valid=widthInput.checkValidity() && heightInput.checkValidity();
+    el('print').disabled=!valid;
+    document.body.classList.toggle('ready',valid);
+    el('error').textContent=valid?'':'Etiket enini 60–104 mm, boyunu 60–200 mm arasında girin.';
+    el('labels').replaceChildren();
+    if(!valid)return;
+    const width=w*8,height=h*8,pad=32;
+    for(const original of artwork){
+      const page=canvas(width,height),ctx=page.getContext('2d');
+      const fit=(x,y)=>Math.min((width-2*pad)/x,(height-2*pad)/y);
+      const upright=fit(original.width,original.height), sideways=fit(original.height,original.width);
+      const rotate=sideways>upright*1.05;
+      const scale=rotate?sideways:upright;
+      const dw=Math.round(original.width*scale),dh=Math.round(original.height*scale);
+      const x=Math.floor((width-(rotate?dh:dw))/2),y=Math.floor((height-(rotate?dw:dh))/2);
+      ctx.translate(x+(rotate?dh:0),y);
+      if(rotate)ctx.rotate(Math.PI/2);
+      ctx.drawImage(original,0,0,dw,dh);
+      const sheet=document.createElement('section');
+      sheet.className='label';sheet.style.setProperty('--w',w+'mm');sheet.style.setProperty('--h',h+'mm');
+      sheet.append(page);el('labels').append(sheet);
+    }
+    pageRule.textContent='@page{size:'+w+'mm '+h+'mm;margin:0}';
+    el('size').textContent=w+' × '+h+' mm';
+    el('status').textContent=ids.length+' sipariş · '+artwork.length+' etiket hazır';
+    try{localStorage.setItem('dhl-print-mm',JSON.stringify({w,h}));}catch{}
+  }
+  [widthInput,heightInput].forEach(input=>input.addEventListener('input',layout));
   try{
     if(!ids.length||ids.length>50||ids.some(id=>!/^\d{1,9}$/.test(id)))throw Error('1–50 geçerli sipariş seçin.');
     const labels=[];
@@ -42,7 +74,7 @@
         return r.text();
       }));labels.push(...batch);el('status').textContent=`${labels.length}/${ids.length} siparişin etiketleri yüklendi…`;
     }
-    worker=new Worker('/dhl-label-worker.js?v=2',{type:'module'});
+    worker=new Worker('/dhl-label-worker.js?v=3',{type:'module'});
     timer=setTimeout(()=>failed('Dönüştürme zaman aşımına uğradı. Daha az sipariş seçip yeniden deneyin.'),180000);
     worker.onerror=()=>failed('Etiket dönüştürücüsü yüklenemedi. Sayfayı yenileyip tekrar deneyin.');
     worker.onmessage=async({data:d})=>{
@@ -56,19 +88,7 @@
         try{
           const rendered=await Promise.all(pending);if(stopped)return;
           if(!rendered.length)throw Error('Etiket görüntüsü boş.');
-          const width=Math.max(...rendered.map(c=>c.width))<=800?800:832;
-          const height=Math.ceil(Math.max(...rendered.map(c=>c.height))/80)*80;
-          const images=[];
-          for(const [i,c] of rendered.entries()){
-            const page=canvas(width,height);page.getContext('2d').drawImage(c,Math.floor((width-c.width)/2),Math.floor((height-c.height)/2));
-            const section=document.createElement('section');section.className='label';section.style.width=width/8+'mm';section.style.height=height/8+'mm';
-            const img=new Image();img.alt=`DHL test etiketi ${i+1}`;img.src=page.toDataURL('image/png');section.append(img);el('labels').append(section);images.push(img);
-          }
-          await Promise.all(images.map(img=>img.decode()));if(stopped)return;
-          const w=width/8,h=height/8,style=document.createElement('style');style.textContent=`@page { size: ${w}mm ${h}mm; margin: 0; }`;document.head.append(style);
-          el('size').textContent=`Yazdırma kağıdı: ${w} × ${h} mm · 203 dpi · Ölçek %100 · Kenar boşlukları yok.`;
-          el('status').textContent=`${ids.length} sipariş, ${images.length} etiket hazır. Her paket ayrı sayfadır. İlk baskıda barkodun okutulabildiğini kontrol edin.`;
-          document.body.classList.add('ready');el('print').disabled=false;clearTimeout(timer);worker.terminate();
+          artwork=rendered;layout();clearTimeout(timer);worker.terminate();
         }catch(e){failed(e.message);}
       }
     };
