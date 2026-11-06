@@ -22,7 +22,6 @@
     const out=canvas(d.rotate?h:w,d.rotate?w:h),ctx=out.getContext('2d');
     if(d.rotate){ctx.translate(0,w);ctx.rotate(-Math.PI/2);}
     ctx.drawImage(source,x0,y0,w,h,0,0,w,h);
-    out.barModule=d.barModule;
     return out;
   }
 
@@ -56,27 +55,14 @@
       ctx.drawImage(source,0,keep[start],width,i-start,0,start,width,i-start);
       start=i;
     }
-    result.barModule=source.barModule;
     return result;
   }
   function layout(artwork){
-    const width=480,height=320,pad=12;
-    for(const full of artwork){
-      const original=compactRows(full);
-      const page=canvas(width,height),ctx=page.getContext('2d');
-      const fit=(x,y)=>Math.min((width-2*pad)/x,(height-2*pad)/y);
-      const upright=fit(original.width,original.height), sideways=fit(original.height,original.width);
-      const rotate=sideways>upright*1.05;
-      const available=rotate?sideways:upright;
-      const scale=available;
-      const dw=Math.round(original.width*scale),dh=Math.round(original.height*scale);
-      const x=Math.floor((width-(rotate?dh:dw))/2),y=Math.floor((height-(rotate?dw:dh))/2);
-      ctx.translate(x+(rotate?dh:0),y);
-      if(rotate)ctx.rotate(Math.PI/2);
-      ctx.drawImage(original,0,0,dw,dh);
+    for(const original of artwork){
       const sheet=document.createElement('section');
       sheet.className='label';
-      sheet.append(page);el('labels').append(sheet);
+      sheet.append(compactRows(original));
+      el('labels').append(sheet);
     }
     el('status').textContent=artwork.length+' etiket hazır.';
     el('print').disabled=false;

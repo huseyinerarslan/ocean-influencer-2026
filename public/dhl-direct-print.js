@@ -4,7 +4,7 @@
     if (active) return;
     const frame = document.createElement('iframe');
     frame.title = 'DHL etiket baskısı';
-    frame.style.cssText = 'position:fixed;left:-10000px;top:0;width:60mm;height:40mm;border:0;pointer-events:none';
+    frame.style.cssText = 'position:fixed;left:-10000px;top:0;width:100vw;height:100vh;border:0;pointer-events:none';
     const query = new URLSearchParams({ids:ids.join(',')});
     if (group) query.set('group',group);
     const status = document.createElement('div');
