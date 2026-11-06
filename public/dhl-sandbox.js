@@ -41,7 +41,7 @@
       <div id="dhlSnapshot"></div>
       ${initial?'<p>Önce yukarıdaki alıcı, il, ilçe ve açık adresi kontrol edip <b>Sipariş Bilgilerini Kaydet</b> düğmesine basın. Kayıtlı ad ve adres DHL test sistemine gönderilecektir.</p><button id="dhlPrepare" class="btn primary">1. Adresi DHL teste gönder</button>':''}
       ${['PREPARED','WAITING'].includes(data.state)?`<p>Her yeni paket 2 kg / 2 desidir.</p><form id="dhlLabelForm"><div id="dhlPackages"></div><div class="ops-actions">${!frozen?'<button type="button" class="btn" id="dhlAddPackage">Paket ekle</button><button type="button" class="btn" id="dhlRemovePackage">Son paketi kaldır</button>':''}<button class="btn primary" id="dhlCreate" type="submit">2. Test barkodu oluştur</button></div></form>`:''}
-      ${data.state==='READY'?'<button id="dhlPreview" class="btn primary">Etiketi görüntüle / Yazdır</button> <button id="dhlDownload" class="btn">ZPL indir (teknik)</button><p>Etiketi görüntüleyip normal yazdırma ekranından yazıcınızı seçebilirsiniz. Bu test etiketini gerçek kargoda kullanmayın.</p>':''}
+      ${data.state==='READY'?'<button id="dhlPreview" class="btn primary">Etiketi yazdır</button> <button id="dhlDownload" class="btn">ZPL indir (teknik)</button><p>Bu test etiketini gerçek kargoda kullanmayın.</p>':''}
       <button id="dhlRefresh" class="btn" style="margin-top:10px">Durumu yenile</button>`;
     const messages={NEW:'Test kaydı henüz oluşturulmadı.',REJECTED:'DHL adres isteğini reddetti. Bilgileri düzeltip kaydettikten sonra tekrar deneyin.',
       PREPARED:'Adres DHL test sistemine gönderildi. Varış şubesi için kısa bir süre beklenir.',
@@ -67,7 +67,7 @@
       tick();if(remaining>=0)timer=setInterval(tick,1000);
     }
     if(el('dhlPreview')) {
-      const openLabel=group=>window.open('/dhl-label.html?order='+encodeURIComponent(activeId)+'&group='+group,'_blank','noopener');
+      const openLabel=group=>window.printDhlLabels([activeId],group);
       el('dhlPreview').onclick=()=>openLabel(1);
       const extras=data.extras || [];
       for(const pack of extras){

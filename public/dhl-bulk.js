@@ -82,7 +82,7 @@
       setBusy(false);summary();
     }
     get('[data-prepare]').onclick=()=>run('prepare');get('[data-create]').onclick=()=>run('create');get('[data-refresh]').onclick=refresh;
-    get('[data-print]').onclick=()=>{const ids=rows.filter(r=>r.data?.state==='READY').map(r=>r.order.id);if(!ids.length){get('[data-summary]').textContent='Henüz hazır barkod yok.';return;}window.open('/dhl-label.html?ids='+ids.join(','),'_blank','noopener');};
+    get('[data-print]').onclick=()=>{const ids=rows.filter(r=>r.data?.state==='READY').map(r=>r.order.id);if(!ids.length){get('[data-summary]').textContent='Henüz hazır barkod yok.';return;}window.printDhlLabels(ids);};
     const timer=setInterval(()=>rows.forEach(update),1000);
     get('[data-close]').onclick=()=>{if(busy)return;clearInterval(timer);modal.remove();window.showBulkPrint?.();};
     await refresh();

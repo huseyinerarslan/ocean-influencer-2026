@@ -25,7 +25,7 @@
       b.addEventListener('click',()=>showBulkPrint());
     }
     const main=document.querySelector('.main');if(main&&!el('bulkprint')){
-      const sec=document.createElement('section');sec.id='bulkprint';sec.className='view';sec.innerHTML=`<div class="card panel"><h3>Toplu Yazdır</h3><p class="muted">Siparişleri seç. Sipariş kağıtları A5 dikey, yazı kağıtları A5 yatay olarak ayrı baskı işi açılır.</p><div class="toolbar"><input id="bpSearch" placeholder="Influencer / sipariş / şehir ara"></div><div class="print-tools"><button class="btn" id="bpAll">Tümünü Seç</button><button class="btn" id="bpClear">Seçimi Temizle</button><button class="btn primary" id="bpOrders">Seçili Sipariş Kağıtları</button><button class="btn primary" id="bpLetters">Seçili Yazı Kağıtları</button><button class="btn" id="bpDhlCreate">Seçili DHL Barkodlarını Oluştur</button><button class="btn primary" id="bpDhl">Seçili DHL Barkodları</button><span class="count" id="bpCount">0 seçili</span></div><div id="bpList" class="bulk-print-list"></div></div>`;main.appendChild(sec);
+      const sec=document.createElement('section');sec.id='bulkprint';sec.className='view';sec.innerHTML=`<div class="card panel"><h3>Toplu Yazdır</h3><p class="muted">Siparişleri seç. Sipariş kağıtları A5 dikey, yazı kağıtları A5 yatay olarak ayrı baskı işi açılır.</p><div class="toolbar"><input id="bpSearch" placeholder="Influencer / sipariş / şehir ara"></div><div class="print-tools"><button class="btn" id="bpAll">Tümünü Seç</button><button class="btn" id="bpClear">Seçimi Temizle</button><button class="btn primary" id="bpOrders">Seçili Sipariş Kağıtları</button><button class="btn primary" id="bpLetters">Seçili Yazı Kağıtları</button><button class="btn" id="bpDhlCreate">Seçili DHL Barkodlarını Oluştur</button><button class="btn primary" id="bpDhl">Seçili DHL barkodlarını yazdır</button><span class="count" id="bpCount">0 seçili</span></div><div id="bpList" class="bulk-print-list"></div></div>`;main.appendChild(sec);
       el('bpDhlCreate').onclick=()=>window.openDhlBatch([...selected].map(id=>bulkOrders.find(o=>Number(o.id)===id)).filter(Boolean));
       el('bpDhl').onclick=()=>{
         const ids=[...selected];
@@ -33,7 +33,7 @@
         if(ids.length>50)return say('Tek seferde en fazla 50 sipariş seçin.');
         const missing=ids.filter(id=>!readyLabels.has(id));
         if(missing.length)return say(missing.length+' siparişin DHL test barkodu hazır değil. Yalnızca DHL hazır yazan kayıtları seçin.');
-        window.open('/dhl-label.html?ids='+ids.join(','),'_blank','noopener');
+        window.printDhlLabels(ids);
       };
       el('bpSearch').addEventListener('input',renderBulk);el('bpAll').onclick=()=>{filteredBulk().forEach(o=>selected.add(Number(o.id)));renderBulk()};el('bpClear').onclick=()=>{selected.clear();renderBulk()};el('bpOrders').onclick=()=>openPrint('order',[...selected]);el('bpLetters').onclick=()=>openPrint('letter',[...selected]);
     }

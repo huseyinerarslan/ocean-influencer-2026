@@ -1,25 +1,10 @@
 <!doctype html>
-<html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>DHL test etiketi · Yazdır</title>
+<html lang="tr"><head><meta charset="utf-8"><title>DHL test etiketi</title>
 <style>
-*{box-sizing:border-box}body{margin:0;background:#edf1f3;color:#173247;font:15px/1.5 system-ui,sans-serif}
-main{max-width:1080px;margin:40px auto;padding:0 24px;display:grid;grid-template-columns:minmax(240px,310px) minmax(0,1fr);align-items:start;gap:28px}
-header{background:white;border:1px solid #d6dee4;border-radius:14px;padding:24px;position:sticky;top:24px}
-h1{font-size:25px;line-height:1.2;margin:0 0 8px}p{margin:8px 0 18px}#status{color:#456075}
-fieldset{border:0;border-top:1px solid #dae1e7;padding:14px 0;margin:16px 0 0;display:flex;gap:12px}label{font-weight:600;font-size:13px;flex:1}
-input{display:block;width:100%;margin:5px 0;padding:8px;border:1px solid #a3b5c1;border-radius:6px;font:inherit}
-button{width:100%;padding:12px;border:0;border-radius:7px;background:#155975;color:white;font:bold 15px system-ui;cursor:pointer}button:disabled{opacity:.5}
-.hint{font-size:13px;color:#485b67}#error{color:#932439}#error:empty{display:none}
-#labels{display:grid;gap:22px;justify-items:center;min-width:0}.label{width:min(100%,var(--w));background:white;box-shadow:0 4px 18px #213b4b28}
-.label canvas{width:100%;height:auto;display:block;image-rendering:pixelated}
-@media(max-width:720px){main{grid-template-columns:1fr;margin:16px auto;padding:0 12px;gap:16px}header{position:static}}
-@media print{html,body,main,#labels{background:white;display:block;margin:0;padding:0;max-width:none}header{display:none}
-.label{width:var(--w);height:var(--h);margin:0;box-shadow:none;break-inside:avoid;break-after:page}.label:last-child{break-after:auto}
-.label canvas{width:var(--w);height:var(--h)}body:not(.ready) #labels{display:none}}
-</style></head><body><main>
-<header><h1>DHL test etiketleri</h1><p id="status" role="status">Etiketler hazırlanıyor…</p>
-<fieldset aria-label="Rulo ölçüsü"><label>Etiket eni (mm)<input id="paperWidth" type="number" min="40" max="104" step="0.5" value="40" required></label>
-<label>Etiket boyu (mm)<input id="paperHeight" type="number" min="40" max="200" step="0.5" value="60" required></label></fieldset>
-<p class="hint">Boyu rulonun ilerlediği yönde ölç. Yazıcıda <b id="size">40 × 60 mm</b> kağıdı, %100 ölçeği ve boşluksuz baskıyı seç.</p>
-<button id="print" disabled>Etiketleri yazdır / PDF kaydet</button><p id="error" role="alert"></p><small>Yalnızca DHL test gönderileri için.</small></header>
-<div id="labels" aria-label="Baskı önizlemesi"></div></main><script src="/dhl-label.js?v=6"></script></body></html>
+@page{size:60mm 40mm;margin:0}
+*{box-sizing:border-box}html,body,main,section{margin:0;padding:0}
+body{font:15px system-ui;color:#173247}header{padding:16px}
+.label,.label canvas{display:block;width:60mm;height:40mm}
+canvas{image-rendering:pixelated}
+@media print{header{display:none}.label{break-inside:avoid;break-after:page}.label:last-child{break-after:auto}body:not(.ready) main{display:none}}
+</style></head><body><header><p id="status" role="status">Etiket hazırlanıyor…</p><p id="error" role="alert"></p><button id="print" disabled>Etiketi yazdır</button></header><main id="labels"></main><script src="/dhl-label.js?v=7"></script></body></html>

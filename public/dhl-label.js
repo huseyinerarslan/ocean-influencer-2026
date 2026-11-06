@@ -5,7 +5,7 @@
   const ids=[...new Set(raw.split(','))];
   let worker,timer,stopped=false;
   const pending=[];
-  function failed(message){stopped=true;clearTimeout(timer);worker?.terminate();el('error').textContent=message;el('status').textContent='Yazdırma hazır değil.';el('print').disabled=true;document.body.classList.remove('ready');el('labels').replaceChildren();}
+  function failed(message){if(parent!==window)parent.postMessage({type:'dhl-print-error',message},location.origin);stopped=true;clearTimeout(timer);worker?.terminate();el('error').textContent=message;el('status').textContent='Yazdırma hazır değil.';el('print').disabled=true;document.body.classList.remove('ready');el('labels').replaceChildren();}
   el('print').onclick=()=>{if(!el('print').disabled)window.print();};
   function canvas(w,h){const c=document.createElement('canvas');c.width=w;c.height=h;const ctx=c.getContext('2d');ctx.fillStyle='white';ctx.fillRect(0,0,w,h);ctx.imageSmoothingEnabled=false;return c;}
   async function prepare(d){
@@ -32,12 +32,22 @@
     const {width,height}=source;
     const pixels=source.getContext('2d').getImageData(0,0,width,height).data;
     const keep=[];
-    let blanks=0;
+    let blanks=0, identicalBars=0, previous=null;
     for(let y=0;y<height;y++){
-      let ink=false;
-      for(let x=0;x<width && !ink;x++)ink=pixels[(y*width+x)*4]<245;
-      if(ink)blanks=0;else blanks++;
-      if(blanks<=32)keep.push(y);
+      const row=pixels.subarray(y*width*4,(y+1)*width*4);
+      let ink=false, edges=0, same=!!previous;
+      for(let x=0;x<width;x++){
+        const dark=row[x*4]<245;
+        if(dark!==ink)edges++;
+        ink=dark;
+        if(same && row[x*4]!==previous[x*4])same=false;
+      }
+      blanks=edges===0 && !ink ? blanks+1 : 0;
+      // Shorten only identical scan lines of a tall linear barcode.
+      // Address text and matrix patterns retain their full height.
+      identicalBars=edges>=30 && same ? identicalBars+1 : 0;
+      if(blanks<=18 && identicalBars<80)keep.push(y);
+      previous=row;
     }
     const result=canvas(width,keep.length),ctx=result.getContext('2d');
     let start=0;
@@ -49,50 +59,29 @@
     result.barModule=source.barModule;
     return result;
   }
-  let artwork=[];
-  const pageRule=document.createElement('style');
-  document.head.append(pageRule);
-  const widthInput=el('paperWidth'),heightInput=el('paperHeight');
-  try{
-    const saved=JSON.parse(localStorage.getItem('dhl-print-roll-mm-v2') || 'null');
-    if(saved){widthInput.value=saved.w;heightInput.value=saved.h;}
-  }catch{}
-  function layout(){
-    if(!artwork.length)return;
-    const w=widthInput.valueAsNumber,h=heightInput.valueAsNumber;
-    const valid=widthInput.checkValidity() && heightInput.checkValidity();
-    el('print').disabled=!valid;
-    document.body.classList.toggle('ready',valid);
-    el('error').textContent=valid?'':'Etiket enini 40–104 mm, boyunu 40–200 mm arasında girin.';
-    el('labels').replaceChildren();
-    if(!valid)return;
-    const width=w*8,height=h*8,pad=Math.min(w,h)<=60?16:32;
+  function layout(artwork){
+    const width=480,height=320,pad=12;
     for(const full of artwork){
-      const original=Math.min(w,h)<=60 ? (full.compact ||= compactRows(full)) : full;
+      const original=compactRows(full);
       const page=canvas(width,height),ctx=page.getContext('2d');
       const fit=(x,y)=>Math.min((width-2*pad)/x,(height-2*pad)/y);
       const upright=fit(original.width,original.height), sideways=fit(original.height,original.width);
       const rotate=sideways>upright*1.05;
       const available=rotate?sideways:upright;
-      // On small stock keep narrow bars on an integer printer-dot grid.
-      const dots=original.barModule;
-      const scale=Math.min(w,h)<=60 && available*dots>=1
-        ? Math.floor(available*dots)/dots : available;
+      const scale=available;
       const dw=Math.round(original.width*scale),dh=Math.round(original.height*scale);
       const x=Math.floor((width-(rotate?dh:dw))/2),y=Math.floor((height-(rotate?dw:dh))/2);
       ctx.translate(x+(rotate?dh:0),y);
       if(rotate)ctx.rotate(Math.PI/2);
       ctx.drawImage(original,0,0,dw,dh);
       const sheet=document.createElement('section');
-      sheet.className='label';sheet.style.setProperty('--w',w+'mm');sheet.style.setProperty('--h',h+'mm');
+      sheet.className='label';
       sheet.append(page);el('labels').append(sheet);
     }
-    pageRule.textContent='@page{size:'+w+'mm '+h+'mm;margin:0}';
-    el('size').textContent=w+' × '+h+' mm';
-    el('status').textContent=ids.length+' sipariş · '+artwork.length+' etiket hazır';
-    try{localStorage.setItem('dhl-print-roll-mm-v2',JSON.stringify({w,h}));}catch{}
+    el('status').textContent=artwork.length+' etiket hazır.';
+    el('print').disabled=false;
+    document.body.classList.add('ready');
   }
-  [widthInput,heightInput].forEach(input=>input.addEventListener('input',layout));
   try{
     if(!ids.length||ids.length>50||ids.some(id=>!/^\d{1,9}$/.test(id)))throw Error('1–50 geçerli sipariş seçin.');
     const labels=[];
@@ -117,7 +106,8 @@
         try{
           const rendered=await Promise.all(pending);if(stopped)return;
           if(!rendered.length)throw Error('Etiket görüntüsü boş.');
-          artwork=rendered;layout();clearTimeout(timer);worker.terminate();
+          layout(rendered);clearTimeout(timer);worker.terminate();
+          if(parent!==window)parent.postMessage({type:'dhl-print-ready'},location.origin);
         }catch(e){failed(e.message);}
       }
     };
