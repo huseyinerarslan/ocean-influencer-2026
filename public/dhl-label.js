@@ -22,15 +22,39 @@
     const out=canvas(d.rotate?h:w,d.rotate?w:h),ctx=out.getContext('2d');
     if(d.rotate){ctx.translate(0,w);ctx.rotate(-Math.PI/2);}
     ctx.drawImage(source,x0,y0,w,h,0,0,w,h);
+    out.barModule=d.barModule;
     return out;
   }
 
+  // Reclaim oversized blank lines between blocks on the compact roll.
+  // Retain a quiet zone on each side of the gap.
+  function compactRows(source){
+    const {width,height}=source;
+    const pixels=source.getContext('2d').getImageData(0,0,width,height).data;
+    const keep=[];
+    let blanks=0;
+    for(let y=0;y<height;y++){
+      let ink=false;
+      for(let x=0;x<width && !ink;x++)ink=pixels[(y*width+x)*4]<245;
+      if(ink)blanks=0;else blanks++;
+      if(blanks<=32)keep.push(y);
+    }
+    const result=canvas(width,keep.length),ctx=result.getContext('2d');
+    let start=0;
+    for(let i=1;i<=keep.length;i++){
+      if(i<keep.length && keep[i]===keep[i-1]+1)continue;
+      ctx.drawImage(source,0,keep[start],width,i-start,0,start,width,i-start);
+      start=i;
+    }
+    result.barModule=source.barModule;
+    return result;
+  }
   let artwork=[];
   const pageRule=document.createElement('style');
   document.head.append(pageRule);
   const widthInput=el('paperWidth'),heightInput=el('paperHeight');
   try{
-    const saved=JSON.parse(localStorage.getItem('dhl-print-mm') || 'null');
+    const saved=JSON.parse(localStorage.getItem('dhl-print-roll-mm-v2') || 'null');
     if(saved){widthInput.value=saved.w;heightInput.value=saved.h;}
   }catch{}
   function layout(){
@@ -39,16 +63,21 @@
     const valid=widthInput.checkValidity() && heightInput.checkValidity();
     el('print').disabled=!valid;
     document.body.classList.toggle('ready',valid);
-    el('error').textContent=valid?'':'Etiket enini 60–104 mm, boyunu 60–200 mm arasında girin.';
+    el('error').textContent=valid?'':'Etiket enini 40–104 mm, boyunu 40–200 mm arasında girin.';
     el('labels').replaceChildren();
     if(!valid)return;
-    const width=w*8,height=h*8,pad=32;
-    for(const original of artwork){
+    const width=w*8,height=h*8,pad=Math.min(w,h)<=60?16:32;
+    for(const full of artwork){
+      const original=Math.min(w,h)<=60 ? (full.compact ||= compactRows(full)) : full;
       const page=canvas(width,height),ctx=page.getContext('2d');
       const fit=(x,y)=>Math.min((width-2*pad)/x,(height-2*pad)/y);
       const upright=fit(original.width,original.height), sideways=fit(original.height,original.width);
       const rotate=sideways>upright*1.05;
-      const scale=rotate?sideways:upright;
+      const available=rotate?sideways:upright;
+      // On small stock keep narrow bars on an integer printer-dot grid.
+      const dots=original.barModule;
+      const scale=Math.min(w,h)<=60 && available*dots>=1
+        ? Math.floor(available*dots)/dots : available;
       const dw=Math.round(original.width*scale),dh=Math.round(original.height*scale);
       const x=Math.floor((width-(rotate?dh:dw))/2),y=Math.floor((height-(rotate?dw:dh))/2);
       ctx.translate(x+(rotate?dh:0),y);
@@ -61,7 +90,7 @@
     pageRule.textContent='@page{size:'+w+'mm '+h+'mm;margin:0}';
     el('size').textContent=w+' × '+h+' mm';
     el('status').textContent=ids.length+' sipariş · '+artwork.length+' etiket hazır';
-    try{localStorage.setItem('dhl-print-mm',JSON.stringify({w,h}));}catch{}
+    try{localStorage.setItem('dhl-print-roll-mm-v2',JSON.stringify({w,h}));}catch{}
   }
   [widthInput,heightInput].forEach(input=>input.addEventListener('input',layout));
   try{
@@ -74,7 +103,7 @@
         return r.text();
       }));labels.push(...batch);el('status').textContent=`${labels.length}/${ids.length} siparişin etiketleri yüklendi…`;
     }
-    worker=new Worker('/dhl-label-worker.js?v=3',{type:'module'});
+    worker=new Worker('/dhl-label-worker.js?v=4',{type:'module'});
     timer=setTimeout(()=>failed('Dönüştürme zaman aşımına uğradı. Daha az sipariş seçip yeniden deneyin.'),180000);
     worker.onerror=()=>failed('Etiket dönüştürücüsü yüklenemedi. Sayfayı yenileyip tekrar deneyin.');
     worker.onmessage=async({data:d})=>{

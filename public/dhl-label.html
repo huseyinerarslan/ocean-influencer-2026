@@ -18,8 +18,8 @@ button{width:100%;padding:12px;border:0;border-radius:7px;background:#155975;col
 .label canvas{width:var(--w);height:var(--h)}body:not(.ready) #labels{display:none}}
 </style></head><body><main>
 <header><h1>DHL test etiketleri</h1><p id="status" role="status">Etiketler hazırlanıyor…</p>
-<fieldset aria-label="Rulo ölçüsü"><label>Etiket eni (mm)<input id="paperWidth" type="number" min="60" max="104" step="0.5" value="100" required></label>
-<label>Etiket boyu (mm)<input id="paperHeight" type="number" min="60" max="200" step="0.5" value="100" required></label></fieldset>
-<p class="hint">Boyu rulonun ilerlediği yönde ölç. Yazıcıda <b id="size">100 × 100 mm</b> kağıdı, %100 ölçeği ve boşluksuz baskıyı seç.</p>
+<fieldset aria-label="Rulo ölçüsü"><label>Etiket eni (mm)<input id="paperWidth" type="number" min="40" max="104" step="0.5" value="40" required></label>
+<label>Etiket boyu (mm)<input id="paperHeight" type="number" min="40" max="200" step="0.5" value="60" required></label></fieldset>
+<p class="hint">Boyu rulonun ilerlediği yönde ölç. Yazıcıda <b id="size">40 × 60 mm</b> kağıdı, %100 ölçeği ve boşluksuz baskıyı seç.</p>
 <button id="print" disabled>Etiketleri yazdır / PDF kaydet</button><p id="error" role="alert"></p><small>Yalnızca DHL test gönderileri için.</small></header>
-<div id="labels" aria-label="Baskı önizlemesi"></div></main><script src="/dhl-label.js?v=5"></script></body></html>
+<div id="labels" aria-label="Baskı önizlemesi"></div></main><script src="/dhl-label.js?v=6"></script></body></html>

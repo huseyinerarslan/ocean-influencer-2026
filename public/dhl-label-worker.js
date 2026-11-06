@@ -14,7 +14,8 @@ self.onmessage=async({data})=>{
       const label=labels[i];
       const png=await zplToBase64Async(self.dhlLabelLayout.printCopy(label.zpl).replace('^XA','^XA'+fontCommand),label.widthMm,label.heightMm,8,{enableInvertedLabels:true,grayscaleOutput:false});
       const rotate=([...label.zpl.matchAll(/\^A[^\^~,]*R/g)].length > [...label.zpl.matchAll(/\^A[^\^~,]*N/g)].length);
-      self.postMessage({type:'label',rotate,index:i,total:labels.length,widthMm:label.widthMm,heightMm:label.heightMm,png});
+      const barModule=Number([...label.zpl.matchAll(/\^BY(\d+)/g)].at(-1)?.[1]) || 2;
+      self.postMessage({type:'label',barModule,rotate,index:i,total:labels.length,widthMm:label.widthMm,heightMm:label.heightMm,png});
     }
     self.postMessage({type:'done'});
   }catch(e){self.postMessage({type:'error',message:'Etiket görüntüye dönüştürülemedi. '+(e.message||'')});}
