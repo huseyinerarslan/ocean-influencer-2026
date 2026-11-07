@@ -45,3 +45,5 @@
 .bp-empty p{font-size:13px}
 @media(max-width:1000px){.bp-workspace{grid-template-columns:minmax(0,1fr) 260px}.bp-row-state{grid-column:2;text-align:left;justify-items:start;gap:5px}.bp-actions{top:12px}}
 @media(max-width:720px){#bulkprint .bp-heading{align-items:flex-start;flex-direction:column;gap:12px}.bp-workspace{display:flex;flex-direction:column}.bp-orders,.bp-actions{width:100%}.bp-actions{position:static}.bp-selection{flex-wrap:wrap}.bp-selection>div{gap:20px}#bulkprint .bulk-print-row{padding:15px;gap:12px}.bp-actions{grid-template-columns:1fr}.bp-card{padding:18px}}
+
+#bulkprint .bp-pagination{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:20px 0 12px}#bulkprint .bp-pagination button{background:white;border:1px solid #d7e3e9;border-radius:10px;padding:10px 16px;color:#22566b;cursor:pointer}#bulkprint .bp-pagination button:disabled{opacity:.4;cursor:default}#bpPage{font-size:13px;color:#657f8c}

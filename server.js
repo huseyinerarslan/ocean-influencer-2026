@@ -365,7 +365,7 @@ app.get('/api/orders', auth, async (req, res) => {
   let i = 1;
 
   if (req.query.q) {
-    where.push(`(o.order_no ILIKE $${i} OR o.recipient_name ILIKE $${i} OR o.city ILIKE $${i})`);
+    where.push(`(o.order_no ILIKE $${i} OR o.recipient_name ILIKE $${i} OR o.city ILIKE $${i} OR o.district ILIKE $${i})`);
     params.push(`%${req.query.q}%`);
     i++;
   }
@@ -388,6 +388,15 @@ app.get('/api/orders', auth, async (req, res) => {
   if (req.query.to) {
     where.push(`o.order_date<=$${i++}`);
     params.push(req.query.to);
+  }
+
+  // Bulk printing reads only one lightweight page, without loading line items.
+  if (req.query.paged === '1') {
+    const page = Math.max(1, Math.min(100000, parseInt(req.query.page, 10) || 1));
+    const result = await pool.query(`SELECT o.id,o.order_no,o.recipient_name,o.address,o.city,o.district,o.order_date,o.status,o.letter_template_no
+      FROM orders o ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+      ORDER BY o.created_at DESC,o.id DESC LIMIT 51 OFFSET $${i}`, [...params, (page - 1) * 50]);
+    return res.json({orders: result.rows.slice(0, 50), page, hasMore: result.rows.length > 50});
   }
 
   const sql = `

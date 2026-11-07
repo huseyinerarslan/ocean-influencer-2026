@@ -151,14 +151,22 @@ function install(app, pool, auth, requireOperations, dhl = createDhlClient()) {
   async function state(db, id, value, group) {
     await db.query('UPDATE dhl_sandbox_shipments SET state=$2, updated_at=NOW() WHERE order_id=$1 AND group_no=$3', [id, value, group]);
   }
+  function labelIds(req) {
+    if(req.query.ids === undefined)return null;
+    const ids=String(req.query.ids).split(',').map(Number);
+    if(!ids.length || ids.length>50 || ids.some(id=>!Number.isSafeInteger(id)||id<=0))throw fail(400,'En fazla 50 geçerli sipariş seçin.');
+    return ids;
+  }
   app.get('/api/dhl/label-progress', ...guard, handle(async (req,res) => {
+    const ids=labelIds(req);
     const {rows} = await pool.query(`SELECT j.order_id,j.error FROM dhl_sandbox_jobs j
-      LEFT JOIN dhl_sandbox_shipments s ON s.order_id=j.order_id AND s.group_no=j.group_no WHERE s.state IS DISTINCT FROM 'READY'`);
+      LEFT JOIN dhl_sandbox_shipments s ON s.order_id=j.order_id AND s.group_no=j.group_no WHERE s.state IS DISTINCT FROM 'READY' ${ids?'AND j.order_id=ANY($1::int[])':''}`,ids?[ids]:[]);
     res.set('Cache-Control','no-store');
     res.json(rows);
   }));
   app.get('/api/dhl/ready-labels', ...guard, handle(async (req,res) => {
-    const rows=await pool.query("SELECT order_id,reference FROM dhl_sandbox_shipments WHERE state='READY' AND group_no=1 AND NOT EXISTS (SELECT 1 FROM dhl_sandbox_jobs j LEFT JOIN dhl_sandbox_shipments x USING(order_id,group_no) WHERE j.order_id=dhl_sandbox_shipments.order_id AND x.state IS DISTINCT FROM 'READY') ORDER BY order_id DESC");
+    const ids=labelIds(req);
+    const rows=await pool.query("SELECT order_id,reference FROM dhl_sandbox_shipments WHERE state='READY' AND group_no=1 AND NOT EXISTS (SELECT 1 FROM dhl_sandbox_jobs j LEFT JOIN dhl_sandbox_shipments x USING(order_id,group_no) WHERE j.order_id=dhl_sandbox_shipments.order_id AND x.state IS DISTINCT FROM 'READY') "+(ids?" AND order_id=ANY($1::int[])":"")+" ORDER BY order_id DESC",ids?[ids]:[]);
     res.set('Cache-Control','no-store');res.json(rows.rows);
   }));
   app.get(route, ...guard, handle(async (req,res) => {
