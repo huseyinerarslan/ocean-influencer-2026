@@ -10,9 +10,14 @@
     if (!r.ok) throw Error(d.error || 'DHL test işlemi tamamlanamadı.');
     return d;
   }
-  const css = document.createElement('style');
-  css.textContent = '#dhlSandboxPanel{border:1px solid #e6c84c;background:#fffcf0;border-radius:12px;padding:16px;margin-top:18px;overflow-wrap:anywhere}#dhlSandboxPanel h4{margin:0 0 8px}#dhlSandboxPanel p{font-size:13px;line-height:1.5}.dhl-pack{display:flex;gap:12px;align-items:end;margin:10px 0;flex-wrap:wrap}.dhl-pack label{display:grid;gap:4px;font-size:13px}.dhl-pack input{width:110px;max-width:100%;padding:8px}#dhlStatus{white-space:pre-line;padding:10px 0}#dhlError{color:#9f1239;white-space:pre-line}#dhlSandboxPanel button:disabled{opacity:.5;cursor:wait}';
+  const css = document.createElement('link');
+  css.rel='stylesheet';
+  css.href='/order-dispatch.css?v=1';
   document.head.append(css);
+  const packageIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m12 3 9 5v9l-9 5-9-5V8l9-5Z"/><path d="m3 8 9 5 9-5M12 13v9M7.5 5.5l9 5v4"/></svg>';
+  function heading(){
+    return '<div class="dispatch-head"><div class="dispatch-title"><span class="dispatch-icon">'+packageIcon+'</span><div><h4>Kargo & paketler</h4><span class="dispatch-carrier">DHL eCommerce</span></div></div><span class="dispatch-test">Test ortamı</span></div>';
+  }
   function panel() {
     let box=el('dhlSandboxPanel');
     if(!box){box=document.createElement('section');box.id='dhlSandboxPanel';document.querySelector('#orderDetailModal .ops-modal')?.append(box);}
@@ -27,28 +32,34 @@
     clearInterval(timer);
     const box=panel();
     if(data.preparing){
-      box.innerHTML='<h4>DHL · TEST ORTAMI</h4><p role="status">Test barkodu arka planda hazırlanıyor. Bu pencereyi kapatabilirsiniz.</p>';
+      box.innerHTML=heading()+'<div class="dispatch-processing" role="status"><span class="dispatch-spinner"></span><div><b>Etiket hazırlanıyor</b><p>Adres kontrolü ve barkod hazırlığı arka planda sürüyor.</p></div></div>';
       timer=setTimeout(()=>{if(box.offsetWidth)refresh();},5000);
       return;
     }
     const frozen=!!data.packages;
     const pending=['CREATING','UNKNOWN','LABEL_CREATING','LABEL_UNKNOWN'].includes(data.state);
     const initial=['NEW','REJECTED'].includes(data.state);
-    box.innerHTML=`<h4>DHL · TEST ORTAMI</h4>
-      <p>Bu bölüm yalnızca DHL test sisteminde çalışır. Gerçek kargo çıkışı yapılmaz, siparişin durumu değişmez. Telefon/e-posta yerine test bilgileri kullanılır; SMS kapalıdır.</p>
-      <div id="dhlStatus" role="status" aria-live="polite"></div>
+    box.innerHTML=heading()+`
       <div id="dhlError" role="alert"></div>
-      <div id="dhlSnapshot"></div>
-      ${initial?'<p>Önce yukarıdaki alıcı, il, ilçe ve açık adresi kontrol edip <b>Sipariş Bilgilerini Kaydet</b> düğmesine basın. Kayıtlı ad ve adres DHL test sistemine gönderilecektir.</p><button id="dhlPrepare" class="btn primary">1. Adresi DHL teste gönder</button>':''}
-      ${['PREPARED','WAITING'].includes(data.state)?`<p>Her yeni paket 2 kg / 2 desidir.</p><form id="dhlLabelForm"><div id="dhlPackages"></div><div class="ops-actions">${!frozen?'<button type="button" class="btn" id="dhlAddPackage">Paket ekle</button><button type="button" class="btn" id="dhlRemovePackage">Son paketi kaldır</button>':''}<button class="btn primary" id="dhlCreate" type="submit">2. Test barkodu oluştur</button></div></form>`:''}
-      ${data.state==='READY'?'<button id="dhlPreview" class="btn primary">Etiketi yazdır</button> <button id="dhlDownload" class="btn">ZPL indir (teknik)</button><p>Bu test etiketini gerçek kargoda kullanmayın.</p>':''}
-      <button id="dhlRefresh" class="btn" style="margin-top:10px">Durumu yenile</button>`;
+      <div class="dispatch-destination"><span>Teslimat adresi</span><div id="dhlSnapshot"></div></div>
+      <div id="dhlStatus" role="status" aria-live="polite"></div>
+      ${initial?'<div class="dispatch-empty"><b>Gönderiye hazırla</b><p>Alıcı bilgilerini kaydettikten sonra etiketi hazırlayabilirsin.</p><button id="dhlPrepare" class="btn primary">Etiketi hazırlamaya başla</button></div>':''}
+      ${['PREPARED','WAITING'].includes(data.state)?`<form id="dhlLabelForm"><div id="dhlPackages"></div><div class="ops-actions">${!frozen?'<button type="button" class="btn" id="dhlAddPackage">Paket ekle</button><button type="button" class="btn" id="dhlRemovePackage">Son paketi kaldır</button>':''}<button class="btn primary" id="dhlCreate" type="submit">Etiketi oluştur</button></div></form>`:''}
+      <div class="dispatch-packages" id="dhlPackageCards">
+      ${data.state==='READY'?`<article class="dispatch-package"><div class="dispatch-package-head"><span class="dispatch-icon">${packageIcon}</span><span class="dispatch-ready">Baskıya hazır</span></div><h5>${data.packages?.length>1?'Paketler 1–'+data.packages.length:'1. Paket'}</h5><div class="dispatch-tracking"><span>Takip numarası</span><strong>${esc(data.shipmentId)}</strong></div><button id="dhlPreview" class="btn primary">Etiketi yazdır <span aria-hidden="true">↗</span></button></article>`:''}
+      </div>
+      <div class="dispatch-footer"><details><summary>Gönderi ayrıntıları</summary><dl><dt>Test referansı</dt><dd>${esc(data.reference||'Henüz oluşturulmadı')}</dd><dt>Varsayılan paket</dt><dd>2 kg · 2 desi</dd></dl><p>Test etiketi gerçek gönderilerde kullanılamaz. SMS kapalıdır.</p>${data.state==='READY'?'<button id="dhlDownload" class="btn">ZPL dosyasını indir</button>':''}</details><button id="dhlRefresh" class="dispatch-refresh">Durumu yenile</button></div>`;
     const messages={NEW:'Test kaydı henüz oluşturulmadı.',REJECTED:'DHL adres isteğini reddetti. Bilgileri düzeltip kaydettikten sonra tekrar deneyin.',
       PREPARED:'Adres DHL test sistemine gönderildi. Varış şubesi için kısa bir süre beklenir.',
       WAITING:'Gönderi barkodu henüz alınamadı. DHL varış şubesini belirleyememiş olabilir. Bir süre sonra aynı kayıtla tekrar deneyin. Devam ederse referans numarasıyla DHL’ye başvurun.',
-      READY:'Test gönderi barkodu hazır. Test gönderi numarası: '+data.shipmentId};
-    el('dhlStatus').textContent=(messages[data.state] || 'Önceki isteğin sonucu belirsiz veya işlem sürüyor. Durumu yenileyin. Değişmiyorsa bu referansla DHL’ye başvurun; mükerrer gönderi oluşturmamak için yeni istek durduruldu.')+(data.reference?'\nTest referansı: '+data.reference:'');
-    if(data.recipient) el('dhlSnapshot').textContent='DHL’ye gönderilen adres: '+[data.recipient.fullName,data.recipient.address,data.recipient.districtName,data.recipient.cityName].join(' · ');
+      READY:''};
+    el('dhlStatus').textContent=data.state==='READY'?'':(messages[data.state] || 'Gönderi durumu kontrol edilmeli. Ayrıntılardaki referans numarasıyla DHL’ye başvurabilirsiniz.');
+    if(data.recipient){
+      const r=data.recipient;
+      el('dhlSnapshot').innerHTML='<b>'+esc(r.fullName)+'</b><p>'+esc([r.address,r.districtName,r.cityName].filter(Boolean).join(' · '))+'</p>';
+    }else{
+      el('dhlSnapshot').textContent='Siparişteki alıcı adresi kullanılacak.';
+    }
     el('dhlRefresh').onclick=()=>refresh();
     if(initial) {
       el('dhlPrepare').disabled=!data.configured;
@@ -63,7 +74,7 @@
       if(el('dhlRemovePackage')) el('dhlRemovePackage').onclick=()=>{if(el('dhlPackages').children.length>1)el('dhlPackages').lastElementChild.remove();};
       el('dhlLabelForm').onsubmit=e=>{e.preventDefault();run('/create',{packages:[...el('dhlPackages').children].map(row=>({kg:Number(row.querySelector('[data-kg]').value),desi:Number(row.querySelector('[data-desi]').value)}))});};
       let remaining=data.retryAfter;
-      const tick=()=>{const b=el('dhlCreate');if(!b)return clearInterval(timer);b.disabled=busy||remaining>0||!data.configured;b.textContent=remaining>0?`Adres işleniyor · ${remaining} sn`:'2. Test barkodu oluştur';remaining--;};
+      const tick=()=>{const b=el('dhlCreate');if(!b)return clearInterval(timer);b.disabled=busy||remaining>0||!data.configured;b.textContent=remaining>0?`Adres işleniyor · ${remaining} sn`:'Etiketi oluştur';remaining--;};
       tick();if(remaining>=0)timer=setInterval(tick,1000);
     }
     if(el('dhlPreview')) {
@@ -71,25 +82,27 @@
       el('dhlPreview').onclick=()=>openLabel(1);
       const extras=data.extras || [];
       for(const pack of extras){
-        const line=document.createElement('p');
-        box.append(line);
+        const line=document.createElement('article');
+        line.className='dispatch-package';
+        line.innerHTML='<div class="dispatch-package-head"><span class="dispatch-icon">'+packageIcon+'</span><span class="'+(pack.state==='READY'?'dispatch-ready':'dispatch-wait')+'">'+(pack.state==='READY'?'Baskıya hazır':pack.error?'Kontrol gerekli':'Hazırlanıyor')+'</span></div><h5>'+pack.group_no+'. Paket</h5>';
+        el('dhlPackageCards').append(line);
         if(pack.state==='READY'){
           const print=document.createElement('button');
           print.className='btn primary';
-          print.textContent=pack.group_no+'. paketi yazdır';
+          print.textContent='Etiketi yazdır ↗';
           print.onclick=()=>openLabel(pack.group_no);
           line.append(print);
         }else{
-          line.textContent=pack.group_no+'. paket · '+(pack.error || 'Barkod hazırlanıyor…');
+          const message=document.createElement('p');message.textContent=pack.error || 'Barkod arka planda hazırlanıyor.';line.append(message);
         }
       }
       const next=Math.max(data.packages?.length || 1,...extras.map(x=>x.group_no))+1;
       if(next<=3 && extras.every(x=>x.state==='READY')){
         const add=document.createElement('button');
-        add.className='btn';
-        add.textContent=next+'. paketi oluştur (2 kg / 2 desi)';
+        add.className='dispatch-add';
+        add.innerHTML='<span aria-hidden="true">+</span><b>'+next+'. paketi ekle</b><small>Ek koli için ayrı etiket</small>';
         add.onclick=()=>run('/extra',{group:next});
-        box.append(add);
+        el('dhlPackageCards').append(add);
       }
       if(extras.some(x=>x.state!=='READY' && !x.error)){
         timer=setTimeout(()=>{if(!busy && box.offsetWidth)refresh();},5000);

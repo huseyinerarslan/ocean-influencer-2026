@@ -527,7 +527,7 @@ function sendApp(res) {
     '/archive-enhancements.js?v=2',
     '/premium-shell.js?v=2',
     '/reports-premium.js?v=3',
-    '/dhl-sandbox.js?v=7',
+    '/dhl-sandbox.js?v=8',
     '/dhl-bulk.js?v=5',
   ];
 

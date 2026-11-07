@@ -1,0 +1,61 @@
+#dhlSandboxPanel{margin-top:24px;border:1px solid #dce5e9;border-radius:18px;background:#f6f9fa;padding:24px;color:#203e4a;overflow-wrap:anywhere}
+#dhlSandboxPanel .dispatch-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;gap:12px}
+.dispatch-title{display:flex;align-items:center;gap:12px}
+#dhlSandboxPanel h4{margin:0;font-size:20px;letter-spacing:-.5px;font-weight:750}
+.dispatch-icon{width:42px;height:42px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;background:#e6f0f1;color:#24636a;flex-shrink:0}
+.dispatch-icon svg{width:25px;height:25px}
+.dispatch-carrier{font-size:12px;color:#657f8a;display:block;margin-top:3px}
+.dispatch-test{font-size:11px;font-weight:700;letter-spacing:.3px;border:1px solid #e2cf9a;border-radius:20px;padding:5px 10px;color:#806022;background:#fff9e9;white-space:nowrap}
+.dispatch-destination{border-top:1px solid #dce5e9;padding:18px 0;display:grid;grid-template-columns:130px 1fr;gap:20px}
+.dispatch-destination>span{font-size:12px;color:#647e88;padding-top:2px}
+#dhlSnapshot b{font-size:14px}#dhlSnapshot p{font-size:12px;line-height:1.65;color:#647984;margin:4px 0 0;max-width:70ch}
+#dhlStatus:empty,#dhlError:empty{display:none}
+#dhlStatus{font-size:13px;padding:0 0 16px;line-height:1.6}
+#dhlError{border:1px solid #efc0cb;border-radius:8px;background:#fff0f3;padding:12px;color:#922c44;font-size:13px;margin-bottom:12px}
+.dispatch-packages{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px}
+.dispatch-package{display:flex;flex-direction:column;border:1px solid #dde7eb;border-radius:12px;background:white;padding:18px;min-height:206px;box-shadow:0 3px 8px #203b4a04}
+.dispatch-package-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.dispatch-ready,.dispatch-wait{font-size:11px;color:#25705d;font-weight:650;background:#edf7f1;padding:4px 8px;border-radius:6px}
+.dispatch-wait{color:#83612a;background:#fff7e6}
+#dhlSandboxPanel h5{font-size:17px;letter-spacing:-.3px;margin:15px 0 10px}
+.dispatch-tracking{margin:0 0 18px}.dispatch-tracking span{font-size:11px;color:#7b909a;display:block;margin-bottom:3px}
+.dispatch-tracking strong{font-size:14px;letter-spacing:1px;font-variant-numeric:tabular-nums}
+#dhlSandboxPanel .dispatch-package .btn.primary{display:flex;justify-content:space-between;width:100%;margin-top:auto;background:#235d6c;border:1px solid #235d6c;border-radius:8px;box-shadow:none;color:white;padding:11px 14px;font-size:13px}
+.dispatch-package>p{font-size:13px;line-height:1.6;color:#687d87}
+#dhlSandboxPanel .dispatch-add{border:1px dashed #adc6cc;border-radius:12px;background:#eff5f6;min-height:206px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;cursor:pointer;color:#386671;font-family:inherit}
+.dispatch-add>span{font-size:30px;font-weight:300;line-height:1}
+.dispatch-add b{font-size:14px}.dispatch-add small{font-size:11px;color:#799099}
+.dispatch-add:hover{background:#e4eff0;border-color:#548d98}
+.dispatch-footer{display:flex;align-items:start;justify-content:space-between;gap:16px;margin-top:20px;padding-top:16px;border-top:1px solid #dce5e9}
+.dispatch-footer details{flex:1;font-size:12px;color:#607985;min-width:0}
+.dispatch-footer summary{cursor:pointer;width:fit-content;padding:5px 0}
+.dispatch-footer dl{display:grid;grid-template-columns:120px 1fr;gap:8px;line-height:1.5}.dispatch-footer dd{margin:0;overflow-wrap:anywhere}.dispatch-footer p{font-size:12px}
+#dhlSandboxPanel .dispatch-refresh{border:0;background:transparent;color:#476b78;font:600 12px inherit;cursor:pointer;padding:5px 0}
+.dispatch-empty{padding:18px;border:1px dashed #b9cdd2;background:white;border-radius:12px;margin-bottom:16px}
+.dispatch-empty p{font-size:13px;color:#6d828a;line-height:1.6}
+.dispatch-processing{display:flex;align-items:center;gap:18px;padding:24px;background:white;border:1px solid #dce5e9;border-radius:12px}
+.dispatch-processing p{font-size:13px;color:#687d87;margin:5px 0}
+.dispatch-spinner{width:24px;height:24px;border:2px solid #d6e6e9;border-top-color:#367c87;border-radius:50%;animation:dispatch-spin 1s linear infinite;flex-shrink:0}
+@keyframes dispatch-spin{to{transform:rotate(360deg)}}
+#dhlSandboxPanel button:disabled{opacity:.5;cursor:wait}
+.dhl-pack{display:flex;gap:12px;align-items:end;margin:10px 0;flex-wrap:wrap}.dhl-pack label{display:grid;gap:4px;font-size:12px}.dhl-pack input{width:100px;max-width:100%;padding:8px}
+#orderDetailModal .print-detail-buttons{display:block;border:1px solid #dce5e9;border-radius:14px;padding:18px;margin:20px 0 24px;background:#fff}
+.dispatch-doc-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
+.dispatch-doc-heading h4{font-size:15px;margin:0;color:#254451}
+#orderDetailModal .dispatch-doc-heading .btn{font-size:12px;padding:8px 12px;background:#eef4f5;border:0;box-shadow:none;color:#2f6371;border-radius:7px}
+.dispatch-doc-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.dispatch-document{display:flex;gap:12px;align-items:center;text-align:left;background:#fafcfd;border:1px solid #e1e9ed;border-radius:9px;padding:15px;cursor:pointer;font-family:inherit;color:#264754;min-width:0}
+.dispatch-document>span:nth-child(2){flex:1}.dispatch-document b{font-size:13px;display:block}.dispatch-document small{font-size:11px;color:#7a8e98;display:block;margin-top:4px}
+.dispatch-paper{display:grid;place-items:center;width:32px;height:40px;background:white;border:1px solid #cbdce3;border-radius:4px;font-size:23px;color:#598797;flex-shrink:0}
+.dispatch-document:hover{background:#eff6f7;border-color:#9fbec8}
+#dhlSandboxPanel button:focus-visible,.dispatch-document:focus-visible,.dispatch-footer summary:focus-visible{outline:3px solid #679daa;outline-offset:3px}
+@media(max-width:600px){
+ #dhlSandboxPanel{padding:16px;border-radius:12px}
+ #dhlSandboxPanel h4{font-size:18px}
+ .dispatch-destination{grid-template-columns:1fr;gap:8px}
+ .dispatch-packages,.dispatch-doc-grid{grid-template-columns:1fr}
+ #dhlSandboxPanel .dispatch-add{min-height:120px}
+ .dispatch-footer dl{grid-template-columns:1fr}
+ .dispatch-doc-heading{flex-wrap:wrap}
+}
+@media(prefers-reduced-motion:reduce){.dispatch-spinner{animation:none}}
