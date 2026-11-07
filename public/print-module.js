@@ -8,11 +8,9 @@
   const req=async url=>{const r=await fetch(url,{credentials:'same-origin'});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'İşlem başarısız');return d};
   const say=msg=>{try{toast(msg)}catch{alert(msg)}};
 
-  const style=document.createElement('style');style.textContent=`
-    .print-tools{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}.print-tools .count{display:flex;align-items:center;padding:0 10px;font-weight:700;color:#526174}
-    .bulk-print-list{display:grid;gap:8px}.bulk-print-row{display:grid;grid-template-columns:auto minmax(190px,1.5fr) minmax(140px,.7fr) minmax(120px,.55fr) minmax(120px,.55fr);gap:12px;align-items:center;background:#fff;border:1px solid #e1e7ef;border-radius:12px;padding:12px}.bulk-print-row input[type=checkbox]{width:20px;height:20px}.bulk-name{font-weight:750}.bulk-sub{font-size:12px;color:#718096;margin-top:3px}.print-detail-buttons{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 14px}.print-detail-buttons .btn{flex:0 0 auto}
-    @media(max-width:800px){.print-tools{display:grid;grid-template-columns:1fr 1fr}.print-tools .count{grid-column:1/-1;padding:4px 0}.bulk-print-row{grid-template-columns:auto 1fr auto;padding:12px}.bulk-print-row .bulk-date,.bulk-print-row .bulk-template{display:none}.bulk-print-row .bulk-status{grid-column:2;color:#64748b;font-size:13px}.print-detail-buttons{display:grid;grid-template-columns:1fr}.print-detail-buttons .btn{width:100%}}
-  `;document.head.appendChild(style);
+  const style=document.createElement('link');
+  style.rel='stylesheet';style.href='/bulk-print.css?v=1';
+  document.head.append(style);
 
   function openPrint(type,ids){if(!ids?.length)return say('Önce en az bir sipariş seç.');window.open('/print.html?type='+encodeURIComponent(type)+'&ids='+ids.join(','),'_blank');}
   window.printOneOrder=id=>openPrint('order',[id]);
@@ -25,8 +23,28 @@
       b.addEventListener('click',()=>showBulkPrint());
     }
     const main=document.querySelector('.main');if(main&&!el('bulkprint')){
-      const sec=document.createElement('section');sec.id='bulkprint';sec.className='view';sec.innerHTML=`<div class="card panel"><h3>Toplu Yazdır</h3><p class="muted">Siparişleri seç. Sipariş kağıtları A5 dikey, yazı kağıtları A5 yatay olarak ayrı baskı işi açılır.</p><div class="toolbar"><input id="bpSearch" placeholder="Influencer / sipariş / şehir ara"></div><div class="print-tools"><button class="btn" id="bpAll">Tümünü Seç</button><button class="btn" id="bpClear">Seçimi Temizle</button><button class="btn primary" id="bpOrders">Seçili Sipariş Kağıtları</button><button class="btn primary" id="bpLetters">Seçili Yazı Kağıtları</button><button class="btn" id="bpDhlCreate">Seçili DHL Barkodlarını Oluştur</button><button class="btn primary" id="bpDhl">Seçili DHL barkodlarını yazdır</button><span class="count" id="bpCount">0 seçili</span></div><div id="bpList" class="bulk-print-list"></div></div>`;main.appendChild(sec);
-      el('bpDhlCreate').onclick=()=>window.openDhlBatch([...selected].map(id=>bulkOrders.find(o=>Number(o.id)===id)).filter(Boolean));
+      const sec=document.createElement('section');sec.id='bulkprint';sec.className='view';sec.innerHTML=`
+      <div class="bp-heading"><div><h3>Toplu çıktı</h3><p>Siparişlerini seç, belgelerini ve kargo etiketlerini birlikte hazırla.</p></div><span id="bpCount" role="status" aria-live="polite">0 sipariş seçili</span></div>
+      <div class="bp-workspace">
+        <div class="bp-orders">
+          <div class="bp-search"><label for="bpSearch">Sipariş ara</label><input id="bpSearch" type="search" placeholder="İsim, sipariş numarası veya şehir"></div>
+          <div class="bp-selection"><span id="bpVisible"></span><div><button id="bpAll">Listedekileri seç</button><button id="bpClear">Seçimi temizle</button></div></div>
+          <div id="bpList" class="bulk-print-list"></div>
+        </div>
+        <aside class="bp-actions" aria-label="Seçili siparişlerin çıktıları">
+          <section class="bp-card"><div class="bp-card-heading"><span class="bp-symbol" aria-hidden="true">≡</span><h4>Sipariş belgeleri</h4></div>
+            <button class="bp-document" id="bpOrders"><span><b>Sipariş kağıtları</b><small>Ürün listesi · A5 dikey</small></span><span aria-hidden="true">↗</span></button>
+            <button class="bp-document" id="bpLetters"><span><b>Yazı kağıtları</b><small>Kişiye özel not · A5 yatay</small></span><span aria-hidden="true">↗</span></button>
+          </section>
+          <section class="bp-card bp-shipping"><div class="bp-card-heading"><span class="bp-symbol" aria-hidden="true">▣</span><div><h4>Kargo etiketleri</h4><small>DHL eCommerce</small></div><span class="bp-test">Test</span></div>
+            <p id="bpReadyCount" aria-live="polite">Başlamak için sipariş seç.</p>
+            <button class="bp-print" id="bpDhl">Etiketleri yazdır <span aria-hidden="true">↗</span></button>
+            <button class="bp-prepare" id="bpDhlCreate">Eksik etiketleri hazırla</button>
+            <small class="bp-note">Her paket ayrı etiket olarak yazdırılır.</small>
+          </section>
+        </aside>
+      </div>`;main.appendChild(sec);
+      el('bpDhlCreate').onclick=()=>window.openDhlBatch([...selected].filter(id=>!readyLabels.has(id)).map(id=>bulkOrders.find(o=>Number(o.id)===id)).filter(Boolean));
       el('bpDhl').onclick=()=>{
         const ids=[...selected];
         if(!ids.length)return say('Önce sipariş seçin.');
@@ -40,8 +58,46 @@
   }
 
   function filteredBulk(){const q=(el('bpSearch')?.value||'').toLocaleLowerCase('tr-TR').trim();if(!q)return bulkOrders;return bulkOrders.filter(o=>[o.recipient_name,o.order_no,o.city,o.district].some(v=>String(v||'').toLocaleLowerCase('tr-TR').includes(q)))}
-  function renderBulk(){const list=el('bpList');if(!list)return;const rows=filteredBulk();list.innerHTML=rows.map(o=>`<label class="bulk-print-row"><input class="bpcheck" type="checkbox" value="${o.id}" ${selected.has(Number(o.id))?'checked':''}><div><div class="bulk-name">${esc(displayName(o))}</div><div class="bulk-sub">${isImported(o)?'Eski Excel kaydı':esc(o.order_no||'')}</div></div><div class="bulk-date">${dateTR(o.order_date)}</div><div class="bulk-template">Yazı: ${esc(o.letter_template_no||'Yok')}</div><div class="bulk-status">${esc(o.status||'')}<div class="bulk-sub">${readyLabels.has(Number(o.id))?'DHL hazır':progress.has(Number(o.id))?esc(progress.get(Number(o.id)) || 'DHL barkodu hazırlanıyor…'):'DHL barkodu henüz oluşturulmadı'}</div></div></label>`).join('')||'<div class="muted">Kayıt bulunamadı.</div>';list.querySelectorAll('.bpcheck').forEach(c=>c.onchange=()=>{const id=Number(c.value);c.checked?selected.add(id):selected.delete(id);updateCount()});updateCount()}
-  function updateCount(){if(el('bpCount'))el('bpCount').textContent=selected.size+' seçili'}
+  const orderStates={NEW:'Yeni',PREPARING:'Hazırlanıyor',SHIPPED:'Kargoya çıktı',DONE:'Tamamlandı',ARCHIVED:'Arşivde'};
+  function labelState(id){
+    if(readyLabels.has(id))return ['ready','Etiket hazır'];
+    if(progress.has(id))return progress.get(id)?['error','Kontrol gerekli']:['pending','Etiket hazırlanıyor'];
+    return ['missing','Etiket bekliyor'];
+  }
+  function renderBulk(){
+    const list=el('bpList');if(!list)return;
+    const rows=filteredBulk();
+    el('bpVisible').textContent=rows.length+' sipariş listeleniyor';
+    list.innerHTML=rows.map(o=>{
+      const id=Number(o.id),[state,label]=labelState(id);
+      return `<label class="bulk-print-row ${selected.has(id)?'is-selected':''}">
+        <input class="bpcheck" type="checkbox" value="${id}" aria-label="${esc(displayName(o))} siparişini seç" ${selected.has(id)?'checked':''}>
+        <div class="bp-recipient"><b>${esc(displayName(o))}</b><span>${esc(isImported(o)?'Excel kaydı':o.order_no||'')} · ${dateTR(o.order_date)}</span><small>${esc([o.district,o.city].filter(Boolean).join(' / ')||'Adres bilgisi eksik')}</small></div>
+        <div class="bp-row-state"><span class="bp-state bp-${state}" title="${esc(progress.get(id)||label)}">${label}</span><small>${esc(orderStates[o.status]||o.status||'')} · ${o.letter_template_no?'Yazı '+esc(o.letter_template_no):'Yazı seçilmemiş'}</small></div>
+      </label>`;
+    }).join('') || '<div class="bp-empty"><b>Sipariş bulunamadı</b><p>Arama ifadesini değiştirerek tekrar deneyebilirsin.</p></div>';
+    list.querySelectorAll('.bpcheck').forEach(c=>c.onchange=()=>{
+      const id=Number(c.value);
+      c.checked?selected.add(id):selected.delete(id);
+      c.closest('label').classList.toggle('is-selected',c.checked);
+      updateCount();
+    });
+    updateCount();
+  }
+  function updateCount(){
+    if(!el('bpCount'))return;
+    const count=selected.size,ready=[...selected].filter(id=>readyLabels.has(id)).length;
+    el('bpCount').textContent=count+' sipariş seçili';
+    const hidden=[...selected].filter(id=>!filteredBulk().some(o=>Number(o.id)===id)).length;
+    el('bpCount').textContent+=hidden?' · '+hidden+' seçim arama dışında':'';
+    el('bpReadyCount').textContent=count?ready+'/'+count+' seçili siparişin etiketi hazır'+(ready<count?'. Eksik etiketleri hazırlayabilirsin.':'. Yazdırmaya hazırsın.'):'Başlamak için sipariş seç.';
+    el('bpOrders').disabled=!count;
+    el('bpLetters').disabled=!count;
+    el('bpDhl').disabled=!count||ready!==count||count>50;
+    el('bpDhlCreate').disabled=!count||ready===count||count>50;
+    el('bpClear').disabled=!count;
+    if(count>50)el('bpReadyCount').textContent='Kargo işlemi için en fazla 50 sipariş seçebilirsin.';
+  }
   async function refreshLabels(){
     clearTimeout(poll);
     const [ready,jobs]=await Promise.all([req('/api/dhl/ready-labels'),req('/api/dhl/label-progress')]);
@@ -50,7 +106,7 @@
     renderBulk();
     if(jobs.some(x=>!x.error))poll=setTimeout(()=>{if(el('bulkprint')?.classList.contains('active'))refreshLabels().catch(e=>say(e.message));},5000);
   }
-  async function showBulkPrint(){ensureMenuAndView();document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));el('bulkprint')?.classList.add('active');document.querySelectorAll('.side [data-v]').forEach(b=>b.classList.toggle('active',b.dataset.v==='bulkprint'));if(el('title'))el('title').textContent='Toplu Yazdır';try{bulkOrders=await req('/api/orders');renderBulk();await refreshLabels().catch(()=>{})}catch(e){say(e.message)}}
+  async function showBulkPrint(){ensureMenuAndView();document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));el('bulkprint')?.classList.add('active');document.querySelectorAll('.side [data-v]').forEach(b=>b.classList.toggle('active',b.dataset.v==='bulkprint'));if(el('title'))el('title').textContent='Toplu Yazdır';try{bulkOrders=await req('/api/orders');const current=new Set(bulkOrders.map(o=>Number(o.id)));for(const id of selected){if(!current.has(id))selected.delete(id);}renderBulk();await refreshLabels().catch(()=>{})}catch(e){say(e.message)}}
   window.showBulkPrint=showBulkPrint;
 
   const originalOpen=window.openOrderDetail;
