@@ -19,7 +19,8 @@
   const recordTitle=o=>isImported(o)?(o.recipient_name||'Influencer'):(o.order_no||o.recipient_name||'Sipariş');
   const recordSub=o=>isImported(o)?'Eski Excel kaydı':(o.recipient_name||'');
 
-  let archiveQuery='';
+  let archiveQuery='',archivePage=1,orderPage=1,archiveVersion=0,orderVersion=0,archiveTimer;
+  function pager(id,parent,callback){let n=$(id);if(!n){n=document.createElement('nav');n.id=id;n.className='ow-pagination';n.innerHTML='<button class="btn" data-prev>← Önceki</button><span></span><button class="btn" data-next>Sonraki →</button>';parent.append(n)}return (page,more)=>{n.querySelector('span').textContent='Sayfa '+page+' · En fazla 50 sipariş';n.querySelector('[data-prev]').disabled=page<=1;n.querySelector('[data-next]').disabled=!more;n.querySelector('[data-prev]').onclick=()=>callback(page-1);n.querySelector('[data-next]').onclick=()=>callback(page+1)}}
 
   const style=document.createElement('style');
   style.id='archive-module-style';
@@ -59,7 +60,7 @@
       else main.appendChild(section);
       $('archiveSearch')?.addEventListener('input',e=>{
         archiveQuery=e.target.value.toLocaleLowerCase('tr-TR');
-        loadArchive();
+        archiveVersion++;clearTimeout(archiveTimer);archiveTimer=setTimeout(()=>loadArchive(1),250);
       });
     }
 
@@ -92,21 +93,20 @@
     await loadArchive();
   }
 
-  async function loadArchive(){
-    const rows=await apiA('/api/orders?status=ARCHIVED');
-    const filtered=rows.filter(x=>
-      !archiveQuery||[x.order_no,x.recipient_name,x.city,x.district]
-        .join(' ')
-        .toLocaleLowerCase('tr-TR')
-        .includes(archiveQuery)
-    );
+  async function loadArchive(page=1){
+    const version=++archiveVersion;archivePage=page;
+    const data=await apiA('/api/orders?paged=1&status=ARCHIVED&page='+page+'&q='+encodeURIComponent(archiveQuery));
+    if(version!==archiveVersion)return;
+    const filtered=data.orders;
+    pager('archivePager',$('archive').querySelector('.panel'),loadArchive)(page,data.hasMore);
     const body=$('archiveRows');
     if(!body)return;
     body.innerHTML=filtered.length?filtered.map(x=>`<tr onclick="openOrderDetail(${x.id})"><td><b>${esc(x.order_no)}</b></td><td>${dateTR(x.order_date)}</td><td>${esc(x.recipient_name)}</td><td>${esc(x.city||'')}</td><td><span class="badge">Arşivde</span></td><td><span class="ops-actions"><button class="btn" onclick="event.stopPropagation();openOrderDetail(${x.id})">Aç</button><button class="btn restore" onclick="event.stopPropagation();restoreOrder(${x.id})">Arşivden Çıkar</button></span></td></tr>`).join(''):`<tr><td colspan="6"><div class="archive-empty">Arşivde sipariş yok.</div></td></tr>`;
   }
   window.loadArchive=loadArchive;
 
-  window.loadOrders=async function(){
+  window.loadOrders=async function(page=1){
+    const version=++orderVersion;orderPage=page;
     const query=new URLSearchParams();
     if($('oq')?.value)query.set('q',$('oq').value);
     if($('os')?.value&&$('os').value!=='all')query.set('status',$('os').value);
@@ -114,8 +114,11 @@
     if($('of')?.value)query.set('from',$('of').value);
     if($('ot')?.value)query.set('to',$('ot').value);
 
-    const all=await apiA('/api/orders?'+query);
-    const orders=all.filter(x=>x.status!=='ARCHIVED');
+    query.set('paged','1');query.set('page',page);query.set('excludeArchived','1');
+    const data=await apiA('/api/orders?'+query);
+    if(version!==orderVersion)return;
+    const orders=data.orders;
+    pager('ordersPager',$('orders'),window.loadOrders)(page,data.hasMore);
 
     const head=document.querySelector('#orders thead tr');
     if(head)head.innerHTML='<th>Kayıt</th><th>Detay</th><th>Tarih</th><th>Şehir</th><th>Durum</th><th>İrsaliye</th><th>DHL</th>';
@@ -138,10 +141,9 @@
       </tr>`;
     }).join('');
 
-    const activeAll=(await apiA('/api/orders')).filter(x=>x.status!=='ARCHIVED');
-    const counts={};
-    activeAll.forEach(x=>{const key=dateKey(x.order_date);if(key)counts[key]=(counts[key]||0)+1});
-    const days=Object.entries(counts).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,60);
+    const daily=await apiA('/api/orders/days');
+    if(version!==orderVersion)return;
+    const days=daily.map(x=>[dateKey(x.order_date),x.count]).filter(x=>x[0]);
     const dayBox=$('days');
     if(dayBox)dayBox.innerHTML=days.map(([key,count])=>`<button class="day" onclick="filterDay('${key}')"><b>${dateTR(key)}</b><span>${count} sipariş</span></button>`).join('');
   };

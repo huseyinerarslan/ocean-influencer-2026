@@ -35,10 +35,25 @@ function installEditRoutes(app,pool,auth){
   });
   app.delete('/api/sets/:id',auth,async(req,res)=>{await ensureCatalog(pool);const q=await pool.query('UPDATE product_sets SET active=false,updated_at=NOW() WHERE id=$1 RETURNING id',[req.params.id]);if(!q.rowCount)return res.status(404).json({error:'Set bulunamadı'});res.json({ok:true})});
 
-  app.get('/api/orders/:id/detail',auth,async(req,res)=>{const q=await pool.query(`SELECT o.*,COALESCE(json_agg(json_build_object('id',oi.id,'item_code',oi.item_code,'item_name',oi.item_name,'qty',oi.qty) ORDER BY oi.id) FILTER (WHERE oi.id IS NOT NULL),'[]') items FROM orders o LEFT JOIN order_items oi ON oi.order_id=o.id WHERE o.id=$1 GROUP BY o.id`,[req.params.id]);if(!q.rowCount)return res.status(404).json({error:'Sipariş bulunamadı'});res.json(q.rows[0])});
+  app.get('/api/orders/:id/detail',auth,async(req,res)=>{const q=await pool.query(`SELECT o.*,COALESCE(json_agg(json_build_object('id',oi.id,'item_code',oi.item_code,'item_name',oi.item_name,'qty',oi.qty,'set_components',oi.set_components) ORDER BY oi.id) FILTER (WHERE oi.id IS NOT NULL),'[]') items FROM orders o LEFT JOIN order_items oi ON oi.order_id=o.id WHERE o.id=$1 GROUP BY o.id`,[req.params.id]);if(!q.rowCount)return res.status(404).json({error:'Sipariş bulunamadı'});res.json(q.rows[0])});
   app.patch('/api/orders/:id/detail',auth,async(req,res)=>{const x=req.body||{};const q=await pool.query(`UPDATE orders SET recipient_name=COALESCE(NULLIF($1,''),recipient_name),phone=$2,city=$3,district=$4,postal_code=$5,address=$6,letter_template_no=$7,status=COALESCE(NULLIF($8,''),status),waybill_no=$9,waybill_done=$10,updated_at=NOW() WHERE id=$11 RETURNING *`,[String(x.recipient_name||'').trim(),x.phone||'',x.city||'',x.district||'',x.postal_code||'',x.address||'',x.letter_template_no||'',x.status||'',x.waybill_no||'',Boolean(x.waybill_done),req.params.id]);if(!q.rowCount)return res.status(404).json({error:'Sipariş bulunamadı'});await addLog(pool,req.params.id,'ORDER_DETAIL_UPDATED',{user:req.user.username});res.json(q.rows[0])});
-  app.post('/api/orders/:id/items',auth,async(req,res)=>{const x=req.body||{},code=String(x.item_code||'').trim();if(!code)return res.status(400).json({error:'Ürün seçmelisin'});const q=await pool.query('INSERT INTO order_items(order_id,item_code,item_name,qty) VALUES($1,$2,$3,$4) RETURNING *',[req.params.id,code,String(x.item_name||code).trim(),Number(x.qty||1)]);await addLog(pool,req.params.id,'ORDER_ITEM_ADDED',{item_code:code,user:req.user.username});res.json(q.rows[0])});
-  app.patch('/api/order-items/:id',auth,async(req,res)=>{const x=req.body||{},old=await pool.query('SELECT * FROM order_items WHERE id=$1',[req.params.id]);if(!old.rowCount)return res.status(404).json({error:'Sipariş kalemi bulunamadı'});const q=await pool.query('UPDATE order_items SET item_code=COALESCE(NULLIF($1,\'\'),item_code),item_name=COALESCE(NULLIF($2,\'\'),item_name),qty=COALESCE($3,qty) WHERE id=$4 RETURNING *',[String(x.item_code||'').trim(),String(x.item_name||'').trim(),x.qty===undefined?null:Number(x.qty),req.params.id]);await addLog(pool,old.rows[0].order_id,'ORDER_ITEM_UPDATED',{item_id:req.params.id,user:req.user.username});res.json(q.rows[0])});
+  app.post('/api/orders/:id/items',auth,async(req,res)=>{
+    try{const [item]=await require('./order-workflow').resolveItems(pool,[req.body]);
+    const q=await pool.query('INSERT INTO order_items(order_id,item_code,item_name,qty,set_components) VALUES($1,$2,$3,$4,$5::jsonb) RETURNING *',[req.params.id,item.item_code,item.item_name,item.qty,JSON.stringify(item.set_components)]);
+    await addLog(pool,req.params.id,'ORDER_ITEM_ADDED',{item_code:item.item_code,user:req.user.username});res.json(q.rows[0]);
+    }catch(e){res.status(e.status||500).json({error:e.status?e.message:'Ürün eklenemedi.'})}
+  });
+  app.patch('/api/order-items/:id',auth,async(req,res)=>{
+    try{const old=await pool.query('SELECT * FROM order_items WHERE id=$1',[req.params.id]);if(!old.rowCount)return res.status(404).json({error:'Sipariş kalemi bulunamadı'});
+    const previous=old.rows[0];const code=String(req.body.item_code||previous.item_code).trim();const qty=Number(req.body.qty??previous.qty);
+    // A quantity-only edit keeps the original set composition, even after catalog refreshes.
+    let item;
+    if(code===previous.item_code){if(!Number.isFinite(qty)||qty<=0||qty>999999||Math.abs(Math.round(qty*1000)-qty*1000)>0.000001)return res.status(400).json({error:'Geçerli pozitif adet girin (en fazla 3 ondalık).'});item={...previous,qty};}
+    else [item]=await require('./order-workflow').resolveItems(pool,[{item_code:code,qty}]);
+    const q=await pool.query('UPDATE order_items SET item_code=$1,item_name=$2,qty=$3,set_components=$4::jsonb WHERE id=$5 RETURNING *',[item.item_code,item.item_name,item.qty,JSON.stringify(item.set_components??null),req.params.id]);
+    await addLog(pool,previous.order_id,'ORDER_ITEM_UPDATED',{item_id:req.params.id,user:req.user.username});res.json(q.rows[0]);
+    }catch(e){res.status(e.status||500).json({error:e.status?e.message:'Ürün güncellenemedi.'})}
+  });
   app.delete('/api/order-items/:id',auth,async(req,res)=>{const q=await pool.query('DELETE FROM order_items WHERE id=$1 RETURNING *',[req.params.id]);if(!q.rowCount)return res.status(404).json({error:'Sipariş kalemi bulunamadı'});await addLog(pool,q.rows[0].order_id,'ORDER_ITEM_REMOVED',{item_code:q.rows[0].item_code,user:req.user.username});res.json({ok:true})});
 
   app.get('/manage',(req,res)=>res.redirect('/manage.html'));

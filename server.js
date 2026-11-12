@@ -12,6 +12,7 @@ const { installImportRoutes } = require('./import-routes-safe');
 const { installEditRoutes } = require('./edit-routes');
 const { installCatalogRoutes } = require('./catalog-import-routes');
 const dhlSandbox = require('./dhl-sandbox');
+const orderWorkflow = require('./order-workflow');
 
 const operationLabels = require('./public/operation-permissions');
 const operationKeys = Object.keys(operationLabels);
@@ -302,6 +303,13 @@ app.post('/api/users', auth, async (req, res) => {
 });
 
 app.get('/api/contacts', auth, async (req, res) => {
+  const query=String(req.query.q||'').trim().slice(0,160);
+  if(req.query.search==='1' && query.length<2)return res.json({rows:[],hasMore:false,page:1});
+  if(req.query.search==='1'){
+    const page=Math.max(1,Math.min(100000,parseInt(req.query.page,10)||1));
+    const {rows}=await pool.query(`SELECT * FROM contacts WHERE name ILIKE $1 OR phone ILIKE $1 OR city ILIKE $1 OR district ILIKE $1 OR address ILIKE $1 ORDER BY name,id LIMIT 21 OFFSET $2`,['%'+query+'%',(page-1)*20]);
+    return res.json({rows:rows.slice(0,20),hasMore:rows.length>20,page});
+  }
   const q = await pool.query('SELECT * FROM contacts ORDER BY name');
   res.json(q.rows);
 });
@@ -370,6 +378,8 @@ app.get('/api/orders', auth, async (req, res) => {
     i++;
   }
 
+  if(req.query.excludeArchived==='1')where.push("o.status<>'ARCHIVED'");
+
   if (req.query.status && req.query.status !== 'all') {
     where.push(`o.status=$${i++}`);
     params.push(req.query.status);
@@ -393,7 +403,7 @@ app.get('/api/orders', auth, async (req, res) => {
   // Bulk printing reads only one lightweight page, without loading line items.
   if (req.query.paged === '1') {
     const page = Math.max(1, Math.min(100000, parseInt(req.query.page, 10) || 1));
-    const result = await pool.query(`SELECT o.id,o.order_no,o.recipient_name,o.address,o.city,o.district,o.order_date,o.status,o.letter_template_no
+    const result = await pool.query(`SELECT o.id,o.order_no,o.recipient_name,o.address,o.city,o.district,o.order_date,o.status,o.waybill_no,o.dhl_tracking_no,o.letter_template_no
       FROM orders o ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
       ORDER BY o.created_at DESC,o.id DESC LIMIT 51 OFFSET $${i}`, [...params, (page - 1) * 50]);
     return res.json({orders: result.rows.slice(0, 50), page, hasMore: result.rows.length > 50});
@@ -425,7 +435,7 @@ app.get('/api/orders', auth, async (req, res) => {
 
 app.get('/api/orders/days', auth, async (req, res) => {
   const q = await pool.query(
-    'SELECT order_date,COUNT(*)::int count FROM orders GROUP BY order_date ORDER BY order_date DESC LIMIT 60',
+    "SELECT order_date,COUNT(*)::int count FROM orders WHERE status<>'ARCHIVED' GROUP BY order_date ORDER BY order_date DESC LIMIT 60",
   );
   res.json(q.rows);
 });
@@ -441,12 +451,13 @@ app.post('/api/orders', auth, async (req, res) => {
   try {
     await client.query('BEGIN');
 
+    const canonicalItems=await orderWorkflow.resolveItems(client,x.items);
     const q = await client.query(
       `INSERT INTO orders(
         order_no,contact_id,recipient_name,phone,city,district,
-        postal_code,address,letter_template_no,status,order_date
+        postal_code,address,letter_template_no,status,order_date,business_partner_code,source_system
       )
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'NEW',COALESCE($10,CURRENT_DATE))
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'NEW',COALESCE($10,CURRENT_DATE),$11,'INFLUENCER')
       RETURNING *`,
       [
         no,
@@ -459,13 +470,14 @@ app.post('/api/orders', auth, async (req, res) => {
         x.address || '',
         x.letter_template_no || '',
         x.order_date || null,
+        process.env.SAP_INF_CARD_CODE || '120.9999',
       ],
     );
 
-    for (const item of x.items || []) {
+    for (const item of canonicalItems) {
       await client.query(
-        'INSERT INTO order_items(order_id,item_code,item_name,qty) VALUES($1,$2,$3,$4)',
-        [q.rows[0].id, item.item_code, item.item_name, Number(item.qty || 1)],
+        'INSERT INTO order_items(order_id,item_code,item_name,qty,set_components) VALUES($1,$2,$3,$4,$5::jsonb)',
+        [q.rows[0].id, item.item_code, item.item_name, item.qty, JSON.stringify(item.set_components)],
       );
     }
 
@@ -478,7 +490,7 @@ app.post('/api/orders', auth, async (req, res) => {
     res.json(q.rows[0]);
   } catch (error) {
     await client.query('ROLLBACK');
-    res.status(500).json({ error: error.message });
+    res.status(error.status || 500).json({ error: error.message });
   } finally {
     client.release();
   }
@@ -526,18 +538,20 @@ const dhlActions = dhlSandbox.install(app, pool, auth, requireOperations);
 installImportRoutes(app, pool, auth);
 installEditRoutes(app, pool, auth);
 installCatalogRoutes(app, pool, auth);
+orderWorkflow.install(app,pool,auth);
 
 const publicDir = path.join(__dirname, 'public');
 
 function sendApp(res) {
   const file = path.join(publicDir, 'index.html');
   const scripts = [
-    '/ux-overhaul.js?v=4',
-    '/archive-enhancements.js?v=2',
+    '/ux-overhaul.js?v=5',
+    '/archive-enhancements.js?v=3',
     '/premium-shell.js?v=2',
     '/reports-premium.js?v=3',
     '/dhl-sandbox.js?v=8',
     '/dhl-bulk.js?v=5',
+    '/order-workspace.js?v=1',
   ];
 
   const tags = scripts.map(src => `<script src="${src}"></script>`).join('');
@@ -554,6 +568,7 @@ app.use(express.static(publicDir));
 app.get('*', (req, res) => sendApp(res));
 
 schema()
+  .then(() => orderWorkflow.schema(pool))
   .then(() => dhlSandbox.schema(pool))
   .then(() => require('./dhl-worker').start(pool, dhlActions))
   .then(() => app.listen(PORT, () => console.log(`Ocean Influencer running on ${PORT}`)))

@@ -102,7 +102,8 @@
   const oldGo=window.go;
   window.go=function(v){
     if(typeof oldGo==='function')oldGo(v);
-    if(v==='sets')window.loadSets?.();
+    if(v==='sets'){window.loadProducts?.();window.loadSets?.();}
+    if(v==='products')window.loadProducts?.();
   };
 
   window.loadProducts=async function(){
@@ -176,7 +177,7 @@
   setTimeout(async()=>{
     try{
       if(!document.getElementById('app')?.classList.contains('hidden')){
-        await window.loadProducts();
+
         if(document.getElementById('orders')?.classList.contains('active'))await window.loadOrders();
       }
     }catch(e){console.error('Ops enhancement init:',e);}

@@ -15,7 +15,7 @@
 
   let editContactId=null;
   let editTemplateId=null;
-  let contactQuery='';
+  let contactQuery='',contactPage=1,contactHasMore=false,contactVersion=0,contactTimer;
   let templateQuery='';
 
   const css=document.createElement('style');
@@ -62,11 +62,11 @@
       if(heading){
         const wrap=document.createElement('div');
         wrap.className='ux-head';
-        wrap.innerHTML='<div><h3>Kişiler & Adresler</h3><p>Kaydı bul, tek tıkla düzenle ve kaydet.</p></div><div class="ux-search"><input id="uxContactSearch" placeholder="İsim / telefon / şehir / adres ara"></div>';
+        wrap.innerHTML='<div><h3>Kişiler & Adresler</h3><p>İsim veya telefonla ara; teslimat adresini kontrol et ve düzenle.</p></div><div class="ux-search"><input id="uxContactSearch" placeholder="İsim / telefon / şehir / adres ara"></div>';
         heading.replaceWith(wrap);
         wrap.querySelector('input').addEventListener('input',e=>{
           contactQuery=e.target.value.toLocaleLowerCase('tr-TR');
-          renderContacts();
+          contactVersion++;clearTimeout(contactTimer);window.contacts=contacts=[];renderContacts();contactTimer=setTimeout(()=>window.loadContacts(1),250);
         });
       }
     }
@@ -149,13 +149,14 @@
   function renderContacts(){
     const list=$('contactList');
     if(!list)return;
-    const rows=(window.contacts||contacts||[]).filter(x=>
+    const rows=(Array.isArray(window.contacts)?window.contacts:contacts).filter(x=>
       !contactQuery||[x.name,x.phone,x.city,x.district,x.address]
         .join(' ')
         .toLocaleLowerCase('tr-TR')
         .includes(contactQuery)
     );
     const groups=groupContacts(rows);
+    if(contactQuery.trim().length<2){list.innerHTML='<div class="ux-empty">Kişileri görmek için en az 2 harf veya telefon numarası yaz.</div>';return;}
 
     list.className='ux-list';
     list.innerHTML=groups.length?groups.map(group=>`
@@ -180,9 +181,10 @@
   }
 
   window.uxEditContact=id=>{
-    const x=(window.contacts||contacts||[]).find(v=>Number(v.id)===Number(id));
+    const x=(Array.isArray(window.contacts)?window.contacts:contacts).find(v=>Number(v.id)===Number(id));
     if(!x)return;
     editContactId=id;
+    if($('contactEditor'))$('contactEditor').open=true;
     $('cn').value=x.name||'';
     $('cp').value=x.phone||'';
     $('cc').value=x.city||'';
@@ -197,14 +199,17 @@
     document.querySelector('#contacts .formgrid')?.scrollIntoView({behavior:'smooth',block:'start'});
   };
 
-  window.loadContacts=async function(){
-    window.contacts=contacts=await apiX('/api/contacts');
-    const select=$('nc');
-    if(select){
-      select.innerHTML='<option value="">Yeni kişi / seçiniz</option>'+
-        contacts.map(x=>`<option value="${x.id}">${esc(x.name)}${x.city?' · '+esc(x.city):''}</option>`).join('');
-    }
-    renderContacts();
+  window.loadContacts=async function(page=1){
+    const version=++contactVersion;contactPage=page;
+    if(contactQuery.trim().length<2){window.contacts=contacts=[];renderContacts();if($('contactPager'))$('contactPager').hidden=true;return;}
+    $('contactList').textContent='Adresler aranıyor…';
+    try{
+      const data=await apiX('/api/contacts?search=1&page='+page+'&q='+encodeURIComponent(contactQuery.trim()));
+      if(version!==contactVersion)return;
+      window.contacts=contacts=data.rows;contactHasMore=data.hasMore;renderContacts();
+      const pager=$('contactPager');pager.hidden=false;pager.querySelector('span').textContent='Sayfa '+page+' · '+data.rows.length+' adres';
+      pager.querySelector('[data-prev]').disabled=page===1;pager.querySelector('[data-next]').disabled=!contactHasMore;
+    }catch(e){if(version===contactVersion)$('contactList').textContent=e.message;}
   };
 
   window.saveContact=async function(){
@@ -226,13 +231,15 @@
 
     notify(editContactId?'Kişi/adres güncellendi':'Kişi/adres eklendi');
     resetContact();
+    if($('contactEditor'))$('contactEditor').open=false;
+    contactQuery=body.name;$('uxContactSearch').value=body.name;
     await window.loadContacts();
   };
 
   function renderTemplates(){
     const list=$('templateList');
     if(!list)return;
-    const rows=(window.templates||templates||[]).filter(x=>
+    const rows=(Array.isArray(window.templates)?window.templates:templates).filter(x=>
       !templateQuery||[x.template_no,x.title,x.body]
         .join(' ')
         .toLocaleLowerCase('tr-TR')
@@ -254,7 +261,7 @@
   }
 
   window.uxEditTemplate=id=>{
-    const x=(window.templates||templates||[]).find(v=>Number(v.id)===Number(id));
+    const x=(Array.isArray(window.templates)?window.templates:templates).find(v=>Number(v.id)===Number(id));
     if(!x)return;
     editTemplateId=id;
     $('tn').value=x.template_no||'';
@@ -299,6 +306,9 @@
 
   addSectionHeads();
   ensureCancelButtons();
+  const contactForm=document.querySelector('#contacts .formgrid');
+  if(contactForm){const details=document.createElement('details');details.id='contactEditor';details.innerHTML='<summary>+ Yeni kişi / adres ekle</summary>';contactForm.before(details);details.append(contactForm);}
+  const pager=document.createElement('nav');pager.id='contactPager';pager.className='ow-pagination';pager.hidden=true;pager.innerHTML='<button class="btn" data-prev>← Önceki</button><span></span><button class="btn" data-next>Sonraki →</button>';$('contactList').after(pager);pager.querySelector('[data-prev]').onclick=()=>window.loadContacts(contactPage-1);pager.querySelector('[data-next]').onclick=()=>window.loadContacts(contactPage+1);
   if($('contactList'))renderContacts();
   if($('templateList'))renderTemplates();
 })();
