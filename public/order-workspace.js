@@ -2,7 +2,7 @@
 'use strict';
 const el=id=>document.getElementById(id), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const call=async(url,body)=>{const r=await fetch(url,{credentials:'same-origin',...(body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});const d=await r.json();if(!r.ok)throw Error(d.error||'İşlem tamamlanamadı');return d};
-const css=document.createElement('link');css.rel='stylesheet';css.href='/order-workspace.css?v=1';document.head.append(css);
+const css=document.createElement('link');css.rel='stylesheet';css.href='/order-workspace.css?v=2';document.head.append(css);
 let recipientVersion=0,recipientTimer,busy=false,pasteBusy=false;
 function message(text){el('orderError').textContent=text;}
 function resetRecipient(){recipientVersion++;clearTimeout(recipientTimer);['nc','nn','np','ncity','nd','npost','na','contactLookup'].forEach(id=>el(id).value='');el('contactMatches').replaceChildren();el('recipientSelection').textContent='Yeni alıcı bilgilerini doldur.';el('nn').focus();}
@@ -13,7 +13,7 @@ el('contactLookup').oninput=()=>{
  const data=await call('/api/contacts?search=1&q='+encodeURIComponent(q));if(version!==recipientVersion)return;
  el('contactMatches').innerHTML=data.rows.length?'':'<p class="muted">Kayıt bulunamadı. Yeni alıcı bilgilerini aşağıya yazabilirsin.</p>';
  data.rows.forEach(person=>{const b=document.createElement('button');b.type='button';b.className='ow-match';b.innerHTML=`<b>${esc(person.name)}</b><span>${esc([person.phone,person.district,person.city].filter(Boolean).join(' · '))}</span><small>${esc(person.address||'Adres eksik')}</small>`;b.onclick=()=>{
- recipientVersion++;clearTimeout(recipientTimer);const fields={nc:person.id,nn:person.name,np:person.phone,ncity:person.city,nd:person.district,npost:person.postal_code,na:person.address};Object.entries(fields).forEach(([id,v])=>el(id).value=v||'');el('contactMatches').replaceChildren();el('contactLookup').value=person.name;el('recipientSelection').textContent='Adres #'+person.id+' seçildi. Buradaki değişiklikler yalnızca bu siparişi etkiler.';};el('contactMatches').append(b)});
+ recipientVersion++;clearTimeout(recipientTimer);const fields={nc:person.id,nn:person.name,np:person.phone,ncity:person.city,nd:person.district,npost:person.postal_code,na:person.address};Object.entries(fields).forEach(([id,v])=>el(id).value=v||'');el('contactMatches').replaceChildren();el('contactLookup').value=person.name;window.dispatchEvent(new CustomEvent('postal-selected',{detail:'new'}));el('recipientSelection').textContent='Adres #'+person.id+' seçildi. Buradaki değişiklikler yalnızca bu siparişi etkiler.';};el('contactMatches').append(b)});
  if(data.hasMore){const p=document.createElement('p');p.className='muted';p.textContent='İlk 20 sonuç. Daha ayrıntılı arayabilirsin.';el('contactMatches').append(p)}
  }catch(e){if(version===recipientVersion)el('contactMatches').textContent=e.message}},250);
 };
@@ -32,7 +32,7 @@ window.addItem=function(){const row=document.createElement('div');row.className=
  el('itemRows').append(row);summary();return row;
 };
 async function pasteRows(text,start){
- if(pasteBusy)return;pasteBusy=true;el('bulkResult').textContent='Ürünler kontrol ediliyor…';
+ if(pasteBusy)return false;pasteBusy=true;el('bulkResult').textContent='Ürünler kontrol ediliyor…';
  try{
  const lines=text.trim().split(/\r?\n/).filter(x=>x.trim()).map(line=>{const cells=line.split('\t').map(x=>x.trim());return {code:cells[0],qty:cells.length>1?cells[cells.length-1]:'1'}});
  if(!lines.length||lines.length>500)throw Error('1–500 satır yapıştırabilirsin.');
@@ -40,17 +40,44 @@ async function pasteRows(text,start){
  const resolved=await call('/api/catalog/resolve',{codes:lines.map(l=>l.code)});
  let errors=0;el('bulkResult').classList.remove('has-error');const empty=[...el('itemRows').children].filter(r=>!r.querySelector('.search-product').value.trim());if(start&&!start.item&&!empty.includes(start))empty.unshift(start);
  resolved.forEach((r,i)=>{const row=empty.shift()||addItem();row.querySelector('.qty').value=Number(lines[i].qty.replace(',','.'));if(r.item)choose(row,r.item);else{errors++;row.item=null;row.querySelector('.prodsel').value='';row.querySelector('.search-product').value=r.code;row.querySelector('.ow-item-name').textContent=r.error;row.classList.add('ow-invalid')}});
- el('bulkCodes').value='';el('bulkResult').classList.toggle('has-error',errors>0);el('bulkResult').textContent=lines.length+' satır eklendi.'+(errors?' '+errors+' satır bulunamadı; işaretli satırları düzelt.':'');summary();
+ el('bulkCodes').value='';el('bulkResult').classList.toggle('has-error',errors>0);el('bulkResult').textContent=lines.length+' satır eklendi.'+(errors?' '+errors+' satır bulunamadı; işaretli satırları düzelt.':'');summary();return true;
  }catch(e){el('bulkResult').classList.add('has-error');el('bulkResult').textContent=e.message}finally{pasteBusy=false}
 }
-window.addBulkItems=()=>pasteRows(el('bulkCodes').value);
+function noteRow(code='',qty=''){
+ if(el('noteRows').children.length>=500)return null;
+ const row=document.createElement('div');row.className='ow-note-row';row.innerHTML='<span class="ow-note-index"></span><input class="note-code" aria-label="Not ürün kodu veya barkodu" placeholder="Kod / barkod"><input class="note-qty" aria-label="Not adedi" inputmode="decimal" placeholder="1"><button type="button" class="btn" aria-label="Not satırını sil">×</button>';
+ row.querySelector('.note-code').value=code;row.querySelector('.note-qty').value=qty;
+ row.querySelector('button').onclick=()=>{row.remove();if(!el('noteRows').children.length)noteRow();numberNotes()};
+ [...row.querySelectorAll('input')].forEach((input,col)=>{
+  input.onpaste=e=>{const value=e.clipboardData.getData('text');if(!/[\t\n]/.test(value))return;e.preventDefault();
+   const matrix=value.replace(/\r/g,'').replace(/\n$/,'').split('\n').map(line=>line.split('\t'));
+   const index=[...el('noteRows').children].indexOf(row);
+   if(index+matrix.length>500||matrix.some(c=>c.length+col>2)){el('bulkResult').textContent='En fazla 500 satır ve iki sütun (kod, adet) yapıştırabilirsin.';el('bulkResult').classList.add('has-error');return;}
+   matrix.forEach((cells,i)=>{const target=el('noteRows').children[index+i]||noteRow();cells.forEach((v,j)=>target.querySelectorAll('input')[col+j].value=v.trim())});numberNotes();
+  };
+  input.onkeydown=e=>{if(e.key==='Enter'||(e.key==='Tab'&&!e.shiftKey&&col===1&&!row.nextElementSibling)){e.preventDefault();const next=row.nextElementSibling||noteRow();next?.querySelector('input').focus()}};
+ });el('noteRows').append(row);numberNotes();return row;
+}
+function numberNotes(){[...el('noteRows').children].forEach((r,i)=>r.querySelector('.ow-note-index').textContent=i+1);}
+function pendingNotes(){return [...el('noteRows').children].some(r=>[...r.querySelectorAll('input')].some(i=>i.value.trim()));}
+window.addBulkItems=async()=>{
+ if(pasteBusy)return;
+ const rows=[...el('noteRows').children].map(r=>({code:r.querySelector('.note-code').value.trim(),qty:r.querySelector('.note-qty').value.trim()})).filter(r=>r.code||r.qty);
+ if(!rows.length){el('bulkResult').textContent='Önce not tablosuna ürün kodlarını gir.';return;}
+ if(rows.some(r=>!r.code)){el('bulkResult').textContent='Adet girilen her satırda ürün kodu da olmalı.';return;}
+ const controls=[...document.querySelectorAll('.ow-paste input,.ow-paste button')];controls.forEach(c=>c.disabled=true);
+ try{if(await pasteRows(rows.map(r=>r.code+'\t'+(r.qty||'1')).join('\n'))){el('noteRows').replaceChildren();for(let i=0;i<4;i++)noteRow();}}finally{controls.forEach(c=>c.disabled=false);}
+};
+el('addNoteRow').onclick=()=>{const row=noteRow();if(row)row.querySelector('input').focus();else el('bulkResult').textContent='En fazla 500 not satırı eklenebilir.'};
+for(let i=0;i<4;i++)noteRow();
 window.saveOrder=async()=>{
  if(busy||pasteBusy)return;message('');
  const rows=[...el('itemRows').children].filter(r=>r.querySelector('.search-product').value.trim());
  if(!rows.length)return message('En az bir ürün satırı gerekli.');
  const invalid=rows.find(r=>!r.item||!Number.isFinite(Number(r.querySelector('.qty').value))||Number(r.querySelector('.qty').value)<=0);
  if(invalid){invalid.classList.add('ow-invalid');invalid.querySelector('.search-product').focus();return message('İşaretli satırın ürününü ve adetini kontrol et.');}
- if(el('bulkCodes').value.trim())return message('Not listesini önce satırlara aktar.');
+ if(pendingNotes())return message('Not tablosundaki satırları önce siparişe aktar.');
+ if(!/^[0-9]{5}$/.test(el('npost').value.trim())){el('npost').focus();return message('SAP teslimat adresi için 5 haneli posta kodunu tamamla.');}
  for(const [id,label] of [['nn','Alıcı adı'],['ncity','İl'],['nd','İlçe'],['na','Açık adres']])if(!el(id).value.trim()){el(id).focus();return message(label+' gerekli.');}
  busy=true;const b=document.querySelector('#new [onclick="saveOrder()"]');b.disabled=true;b.textContent='Sipariş kaydediliyor…';
  try{const body={contact_id:el('nc').value||null,recipient_name:el('nn').value.trim(),phone:el('np').value.trim(),city:el('ncity').value.trim(),district:el('nd').value.trim(),postal_code:el('npost').value.trim(),address:el('na').value.trim(),letter_template_no:el('nt').value,order_date:el('ndate').value,items:rows.map(r=>({item_code:r.item.item_code,qty:Number(r.querySelector('.qty').value)}))};

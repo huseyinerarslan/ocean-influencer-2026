@@ -13,6 +13,7 @@ const { installEditRoutes } = require('./edit-routes');
 const { installCatalogRoutes } = require('./catalog-import-routes');
 const dhlSandbox = require('./dhl-sandbox');
 const orderWorkflow = require('./order-workflow');
+const postalAddress = require('./postal-address');
 
 const operationLabels = require('./public/operation-permissions');
 const operationKeys = Object.keys(operationLabels);
@@ -316,6 +317,7 @@ app.get('/api/contacts', auth, async (req, res) => {
 
 app.post('/api/contacts', auth, async (req, res) => {
   const x = req.body || {};
+  const postalError=postalAddress.postalError(x);if(postalError)return res.status(400).json({error:postalError});
   const q = await pool.query(
     'INSERT INTO contacts(name,phone,city,district,postal_code,address) VALUES($1,$2,$3,$4,$5,$6) RETURNING *',
     [x.name, x.phone || '', x.city || '', x.district || '', x.postal_code || '', x.address || ''],
@@ -442,6 +444,7 @@ app.get('/api/orders/days', auth, async (req, res) => {
 
 app.post('/api/orders', auth, async (req, res) => {
   const x = req.body || {};
+  const postalError=postalAddress.postalError(x);if(postalError)return res.status(400).json({error:postalError});
   const packages = [{kg:2, desi:2}];
   try { dhlSandbox.recipient(x); }
   catch (error) { return res.status(400).json({error:error.message}); }
@@ -539,6 +542,7 @@ installImportRoutes(app, pool, auth);
 installEditRoutes(app, pool, auth);
 installCatalogRoutes(app, pool, auth);
 orderWorkflow.install(app,pool,auth);
+postalAddress.install(app,pool,auth);
 
 const publicDir = path.join(__dirname, 'public');
 
@@ -551,7 +555,8 @@ function sendApp(res) {
     '/reports-premium.js?v=3',
     '/dhl-sandbox.js?v=8',
     '/dhl-bulk.js?v=5',
-    '/order-workspace.js?v=1',
+    '/order-workspace.js?v=2',
+    '/postal-address.js?v=1',
   ];
 
   const tags = scripts.map(src => `<script src="${src}"></script>`).join('');

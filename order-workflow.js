@@ -31,7 +31,7 @@ async function resolveItems(db,lines){
 }
 function draft(order,items){
  return {schemaVersion:1,mode:'PREVIEW_ONLY',readyForSap:false,
-  blockers:['YKTP Entegra Sipariş UDO/alan eşlemesi doğrulanmalı.','Depo, fiyat/iskonto, vergi ve belge serisi kuralları doğrulanmalı.','Entegra kaydından irsaliyeye geçiş ve mükerrer kayıt kontrolü SAP ekibiyle test edilmeli.'],
+  blockers:[...(require('./postal-address').postalError(order)?[require('./postal-address').postalError(order)]:[]),'YKTP Entegra Sipariş UDO/alan eşlemesi doğrulanmalı.','Depo, fiyat/iskonto, vergi ve belge serisi kuralları doğrulanmalı.','Entegra kaydından irsaliyeye geçiş ve mükerrer kayıt kontrolü SAP ekibiyle test edilmeli.'],
   source:{system:order.source_system||'LEGACY',orderId:String(order.id),orderNumber:order.order_no,idempotencyKey:`OCEAN-INF-${order.id}`},
   customer:{cardCode:order.business_partner_code||null},
   delivery:{name:order.recipient_name,phone:order.phone,city:order.city,district:order.district,postalCode:order.postal_code,address:order.address},

@@ -37,3 +37,8 @@ Import through a staging transaction: validate duplicates, positive quantities, 
 
 ## Deployment
 Existing PostgreSQL data remains in place. New columns/tables use additive IF NOT EXISTS migrations. No historical shipments or orders are queued to SAP. DHL remains sandbox-only.
+
+## Postal code gate
+New orders and contact/address edits require a five-digit nonzero postcode. Recognized Turkish province prefixes are checked. This is structural validation, not PTT verification. SAP preview explicitly includes a missing/invalid postal blocker for legacy records.
+
+GET /api/address/postal-code only reuses a single consistent code from an exact city + district + full-address match in existing records. It never guesses city-centre codes. The response identifies source=saved_address and verified=false. Address edits clear the previous code; stale asynchronous suggestions cannot overwrite manual input. PTT's public lookup was unavailable during implementation, so nationwide authoritative neighborhood lookup is NOT connected. Connecting a verified postal reference (PTT/SAP approved address catalog) remains required before claiming official postcode validation.
